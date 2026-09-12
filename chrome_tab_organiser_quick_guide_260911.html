@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chrome_tab_organiser &mdash; Quick Guide</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif; color:#20242e;
+         font-size: 10pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 2pt; }
+  h2 { font-size: 13pt; color:#1663c5; border-bottom: 2px solid #1663c5;
+       padding-bottom: 3pt; margin: 16pt 0 7pt; page-break-after: avoid; }
+  h3 { font-size: 10.5pt; margin: 10pt 0 4pt; color:#1f2430; page-break-after: avoid; }
+  p { margin: 5pt 0; }
+  ul, ol { margin: 5pt 0; padding-left: 18pt; }
+  li { margin: 2pt 0; }
+  tt, code { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 8.5pt;
+             background:#eef1f6; border-radius: 3px; padding: 0 3px; color:#0b3d91; }
+  pre { background:#1f2430; color:#e8ecf3; border-radius: 6px; padding: 8pt 10pt;
+        font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 8.5pt;
+        white-space: pre-wrap; margin: 6pt 0; page-break-inside: avoid; }
+  pre code { background:none; color:inherit; padding:0; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0; font-size: 8.8pt; }
+  th { background:#eef2fb; color:#1f2430; text-align:left; padding:4pt 7pt;
+       border:1px solid #d7dbe2; }
+  td { padding:4pt 7pt; border:1px solid #d7dbe2; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .tip { background:#e9f5ec; border-left:4px solid #188038; border-radius:4px;
+         padding: 6pt 10pt; margin: 8pt 0; }
+  .warn { background:#fdeceb; border-left:4px solid #d93025; border-radius:4px;
+         padding: 6pt 10pt; margin: 8pt 0; }
+  footer { margin-top: 14pt; color:#9aa0a6; font-size: 8pt; text-align:center; }
+  .kbd { font-family: Consolas, monospace; background:#eef1f6; border-radius:3px;
+         padding: 0 3px; font-size: 8.5pt; border:1px solid #d7dbe2; }
+</style>
+</head>
+<body>
+
+<h1>chrome_tab_organiser</h1>
+<p>Two Python tools (standard library only &mdash; no installs): <code>chrome_report_v1.1.py</code>
+generates an HTML report of your open Chrome tabs by tab group, and
+<code>chrome_report_edit_v1.3.py</code> is a local web app for editing that report.</p>
+
+<h2>1&nbsp;&nbsp;Requirements</h2>
+<ul>
+  <li><b>Python</b>: version 3, plus the two files <code>chrome_report_v1.1.py</code> and
+      <code>chrome_report_edit_v1.3.py</code> in the same folder.</li>
+  <li><b>No Python?</b> Use the pre-built executables <code>chrome_report_v1.1.exe</code> and
+      <code>chrome_report_edit_v1.3.exe</code> (same folder) instead &mdash; same commands, no install needed.</li>
+  <li>Chrome needs to have logged-in/session data in its <b>Default</b> profile on this machine.</li>
+</ul>
+
+<h2>2&nbsp;&nbsp;Generate the report</h2>
+<pre><code>python chrome_report_v1.1.py                  # -> chrome_tabs_Default_v1.1.html
+chrome_report_v1.1.exe                        # same, no Python needed (double-click works)
+python chrome_report_v1.1.py --json --outdir reports   # also JSON, into .\reports</code></pre>
+<ul>
+  <li>Chrome may keep running &mdash; the report is read from its session files on disk.</li>
+  <li><code>--data-dir PATH</code> &mdash; non-standard Chrome data directory.</li>
+  <li>If a <code>warning: skipped (... in use by Chrome)</code> appears, wait a few seconds and re-run.</li>
+</ul>
+
+<h2>3&nbsp;&nbsp;Run the editor</h2>
+<pre><code>python chrome_report_edit_v1.3.py --dir reports   # browser opens at http://127.0.0.1:8765/
+chrome_report_edit_v1.3.exe --dir reports         # same, no Python needed</code></pre>
+<ul>
+  <li><code>--dir PATH</code> folder of <code>*.html</code> reports to manage (default: the script&rsquo;s folder).</li>
+  <li><code>--port N</code> / <code>--host ADDR</code> &mdash; default <code>8765</code> / <code>127.0.0.1</code>.
+      Use <code>--port 9000</code> if 8765 is busy.</li>
+  <li><code>--no-browser</code> &mdash; print the URL instead of auto-opening.</li>
+  <li>Stop the server with <code>Ctrl+C</code> in the terminal.</li>
+</ul>
+
+<h2>4&nbsp;&nbsp;Editor options at a glance</h2>
+<table>
+  <tr><th style="width:34%">Control</th><th>What it does</th></tr>
+  <tr><td><b>Dropdown</b> + <b>Load</b></td><td>Pick a report from the managed folder and load it.</td></tr>
+  <tr><td><b>Open&hellip;</b></td><td>Load any <code>.html</code> report file from anywhere.</td></tr>
+  <tr><td>Click a <b>tab title</b>, <b>URL</b>, <b>group chip</b> or <b>&ldquo;Window N&rdquo;</b> heading</td><td>Rename it in place.
+      Editing a URL also updates the link; clearing a group name ungroups the tab.</td></tr>
+  <tr><td><b>+</b> on a row / <b>Add tab</b> in a window header</td><td>Insert a tab after that row / at the end of the window.
+      Dialog asks: <b>Window</b>, <b>Position</b>, <b>Group</b> (optional), <b>Tab name</b>, <b>URL</b>.</td></tr>
+  <tr><td><b>&times;</b> on a row</td><td>Delete that tab. (<span class="kbd">Ctrl+Backspace</span> also works while a row is focused.)</td></tr>
+  <tr><td><b>&ldquo;sort groups alphabetically&rdquo;</b> tick-box</td><td>Rearrange the <em>current</em> report: within each window,
+      ungrouped rows first, then tab groups A&ndash;Z (case-insensitive).
+      Untick &rarr; restores the previous order. Inserting while sorted keeps the row where you placed it.</td></tr>
+  <tr><td><b>Name box</b> + <b>Save</b></td><td>Write the report to disk under that <code>*.html</code> name
+      (Enter also saves). Nothing is saved until you press Save.</td></tr>
+</table>
+
+<h2>5&nbsp;&nbsp;One-minute workflow</h2>
+<pre><code>python chrome_report_v1.1.py --outdir reports
+python chrome_report_edit_v1.3.py --dir reports
+# Load chrome_tabs_Default_v1.1.html - rename / insert / delete / tick the sort box as you like
+# type a new name, press Save -> reports/&lt;name&gt;.html</code></pre>
+<div class="tip"><b>Remember:</b> reports always load in their original order &mdash; the sort
+tick-box never runs by itself. Opening a new report resets it.</div>
+
+<footer>chrome_tab_organiser &mdash; chrome_report_v1.1.py &middot; chrome_report_edit_v1.3.py &mdash; Python 3, no external dependencies</footer>
+
+</body>
+</html>
