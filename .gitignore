@@ -1,0 +1,18 @@
+# credentials / local-only notes — never commit
+260912 - gh cred.txt
+261004_git_update.txt
+
+# Python build artifacts
+__pycache__/
+*.pyc
+
+# R session history
+.Rhistory
+
+# generator outputs / sample reports (local only — contain real browsing data)
+report.json
+chrome_tabs_report.html
+chrome_tabs_Default*.html
+chrome_tabs_Default*.json
+v1_out/
+v1_1_out_260911/
