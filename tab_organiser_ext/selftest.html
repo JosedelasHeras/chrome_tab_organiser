@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tab organiser - extension self-test</title>
+<style>
+  body { font:14px "Segoe UI", system-ui, Arial, sans-serif; margin:0; padding:24px 28px;
+         background:#f6f7f9; color:#1f2430; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  .meta { color:#6b7280; font-size:12px; margin-bottom:16px; max-width:70ch; }
+  section { background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+            margin-bottom:16px; padding:14px 16px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  .status { font-size:13px; margin-bottom:12px; display:flex; gap:8px;
+            align-items:center; flex-wrap:wrap; }
+  .badge { font-size:12px; padding:2px 10px; border-radius:12px; background:#eef0f3;
+           color:#5f6368; }
+  .badge.on { background:#e6f4ea; color:#137333; }
+  .err { color:#c5221f; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th, td { text-align:left; padding:4px 8px; border-bottom:1px solid #e5e7eb;
+           vertical-align:top; }
+  th { color:#6b7280; font-size:11px; text-transform:uppercase; }
+  td.detail { font-family:Consolas, monospace; color:#5f6368; word-break:break-all; }
+  .pass { color:#137333; font-weight:600; }
+  .fail { color:#c5221f; font-weight:600; }
+  .window-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  button { font:inherit; font-size:12px; padding:5px 12px; cursor:pointer;
+           border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#1f2430; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+</style>
+</head>
+<body>
+<h1>tab organiser &mdash; extension self-test</h1>
+<div class="meta">Open this page as a <b>file://</b> URL in the browser where the
+extension is loaded. It runs a handful of real Chrome API calls (each one opens
+example.com tabs in a new window), so close those windows afterwards. Nothing
+here touches your existing windows &mdash; the extension only creates new ones.</div>
+
+<div class="status">
+  <span class="badge" id="ext-status">checking extension...</span>
+  <span id="action-status"></span>
+</div>
+
+<section>
+  <h2>checks</h2>
+  <table>
+    <thead><tr><th>result</th><th>check</th><th>detail</th></tr></thead>
+    <tbody id="log"></tbody>
+  </table>
+</section>
+
+<section>
+  <h2>try the buttons by hand</h2>
+  <div class="window-actions">
+    <button data-action="chrome-window" disabled
+            data-ungrouped="https://example.com/plain-1,https://example.com/plain-2"
+            data-groups="alpha|#1a73e8|https://example.com/alpha-1,beta|#e37400|https://example.com/beta-1,https://example.com/beta-2">Open window in Chrome</button>
+    <button data-action="chrome-group" data-group="alpha" data-color="#1a73e8"
+            data-urls="https://example.com/alpha-1,https://example.com/alpha-2"
+            disabled>Open group "alpha" in Chrome</button>
+    <button data-action="chrome-group" data-group="beta" data-color="#e37400"
+            data-urls="https://example.com/beta-1,https://example.com/beta-2"
+            disabled>Open group "beta" in Chrome</button>
+  </div>
+</section>
+
+<script>
+(function () {
+  var log = document.getElementById('log');
+  var passed = 0;
+  var total = 0;
+  var REPORT_SRC = 'tab-organiser-report';
+  var EXT_SRC = 'tab-organiser-ext';
+
+  function record(ok, name, detail) {
+    total += 1;
+    if (ok) { passed += 1; }
+    var tr = document.createElement('tr');
+    var res = document.createElement('td');
+    res.className = ok ? 'pass' : 'fail';
+    res.textContent = ok ? 'PASS' : 'FAIL';
+    var nm = document.createElement('td');
+    nm.textContent = name;
+    var dt = document.createElement('td');
+    dt.className = 'detail';
+    dt.textContent = detail == null ? '' : String(detail);
+    tr.appendChild(res);
+    tr.appendChild(nm);
+    tr.appendChild(dt);
+    log.appendChild(tr);
+  }
+
+  function status(text, isError) {
+    var el = document.getElementById('action-status');
+    if (!el) { return; }
+    el.textContent = text || '';
+    el.className = isError ? 'err' : '';
+  }
+
+  function badge(text, on) {
+    var el = document.getElementById('ext-status');
+    if (!el) { return; }
+    el.textContent = text;
+    el.className = on ? 'badge on' : 'badge';
+  }
+
+  function extCall(action, payload, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var id = Math.random().toString(36).slice(2);
+      var timer = window.setTimeout(function () {
+        window.removeEventListener('message', onMessage);
+        reject(new Error('no response from the extension'));
+      }, timeoutMs || 20000);
+function onMessage(event) {
+      var data = event.data;
+      if (event.source !== window || !data || data.src !== EXT_SRC
+          || data.id !== id) { return; }
+        window.removeEventListener('message', onMessage);
+        window.clearTimeout(timer);
+        if (data.ok) { resolve(data.result); } else { reject(new Error(data.error)); }
+      }
+      window.addEventListener('message', onMessage);
+      window.postMessage({
+        src: REPORT_SRC, id: id, action: action, payload: payload || {}
+      }, '*');
+    });
+  }
+
+  function list(text) {
+    return String(text || '').split(',').map(function (part) {
+      return part.trim();
+    }).filter(Boolean);
+  }
+
+  function payloadFor(button) {
+    var action = button.getAttribute('data-action');
+    if (action === 'chrome-group') {
+      return {
+        group: button.getAttribute('data-group') || '',
+        color: button.getAttribute('data-color') || '',
+        urls: list(button.getAttribute('data-urls'))
+      };
+    }
+    var groups = list(button.getAttribute('data-groups')).map(function (spec) {
+      var bits = spec.split('|');
+      return {
+        group: bits[0] || '',
+        color: bits[1] || '',
+        urls: list(bits[2])
+      };
+    });
+    return {ungrouped: list(button.getAttribute('data-ungrouped')), groups: groups};
+  }
+
+  var CASES = [
+    {name: 'ping', action: 'ping', payload: {},
+     expect: function (r) { return !!(r && r.version); },
+     detail: function (r) { return 'version ' + (r && r.version); }},
+    {name: 'open-group ("alpha")', action: 'open-group',
+     payload: {group: 'alpha', color: '#1a73e8',
+               urls: ['https://example.com/alpha-1', 'https://example.com/alpha-2']},
+     expect: function (r) { return !!r && r.tabs === 2 && r.groupId >= 0; },
+     detail: function (r) { return 'tabs=' + r.tabs + ' groupId=' + r.groupId; }},
+    {name: 'open-group (empty)', action: 'open-group',
+     payload: {group: 'nothing', color: '', urls: []},
+     expectError: /no tabs|nothing to open|empty/i},
+    {name: 'open-group (invalid url)', action: 'open-group',
+     payload: {group: 'bad', color: '', urls: ['definitely not a url']},
+     expectError: /invalid|url/i},
+    {name: 'open-window (2 ungrouped + 2 groups)', action: 'open-window',
+     payload: {
+       ungrouped: ['https://example.com/plain-1', 'https://example.com/plain-2'],
+       groups: [
+         {group: 'alpha', color: '#1a73e8', urls: ['https://example.com/alpha-1']},
+         {group: 'beta', color: '#e37400',
+          urls: ['https://example.com/beta-1', 'https://example.com/beta-2']}
+       ]},
+     expect: function (r) { return !!r && r.tabs === 5 && r.groups === 2; },
+     detail: function (r) {
+       return 'tabs=' + r.tabs + ' groups=' + r.groups + ' ungrouped=' + r.ungrouped;
+     }},
+    {name: 'open-window (empty)', action: 'open-window',
+     payload: {ungrouped: [], groups: []},
+     expectError: /no tabs|nothing to open|empty/i}
+  ];
+
+  function runCase(index) {
+    if (index >= CASES.length) {
+      badge('finished: ' + passed + '/' + total + ' checks passed', passed === total);
+      status('');
+      return;
+    }
+    var testCase = CASES[index];
+    extCall(testCase.action, testCase.payload).then(function (result) {
+      if (testCase.expectError) {
+        record(false, testCase.name,
+               'expected an error, got ' + JSON.stringify(result));
+      } else {
+        var ok = false;
+        try {
+          ok = !!testCase.expect(result);
+        } catch (err) {
+          ok = false;
+        }
+        record(ok, testCase.name, testCase.detail ? testCase.detail(result)
+               : JSON.stringify(result));
+      }
+      runCase(index + 1);
+    }).catch(function (err) {
+      record(!!testCase.expectError, testCase.name, err.message);
+      runCase(index + 1);
+    });
+  }
+
+  document.addEventListener('click', function (event) {
+    var button = event.target && event.target.closest
+      ? event.target.closest('[data-action]') : null;
+    if (!button || button.disabled) { return; }
+    var payload = payloadFor(button);
+    status('running ' + button.getAttribute('data-action') + '...');
+    extCall(button.getAttribute('data-action'), payload).then(function (result) {
+      status('done: ' + JSON.stringify(result));
+    }).catch(function (err) {
+      status(err.message, true);
+    });
+  });
+
+  var tries = 0;
+  (function check() {
+    if (document.documentElement.getAttribute('data-tab-organiser-ext') === 'ready') {
+      badge('extension detected', true);
+      Array.prototype.forEach.call(document.querySelectorAll('[data-action]'),
+        function (button) { button.disabled = false; });
+      status('running checks...');
+      runCase(0);
+      return;
+    }
+    if (tries < 50) {
+      tries += 1;
+      window.setTimeout(check, 100);
+      return;
+    }
+    badge('extension NOT detected - load tab_organiser_ext as an unpacked extension',
+          false);
+    record(false, 'extension handshake',
+           'data-tab-organiser-ext never became "ready" (unpacked extension not ' +
+           'loaded, or file URLs not allowed)');
+  })();
+})();
+</script>
+</body>
+</html>

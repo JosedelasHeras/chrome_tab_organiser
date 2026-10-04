@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chrome_tab_organiser &mdash; User Guide</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif; color:#20242e;
+         font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; }
+  h2 { font-size: 15pt; color:#1663c5; border-bottom: 2px solid #1663c5;
+       padding-bottom: 4pt; margin: 22pt 0 10pt; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 14pt 0 6pt; color:#1f2430; page-break-after: avoid; }
+  p { margin: 6pt 0; }
+  ul, ol { margin: 6pt 0; padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  tt, code { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+             background:#eef1f6; border-radius: 3px; padding: 0 3px; color:#0b3d91; }
+  pre { background:#1f2430; color:#e8ecf3; border-radius: 6px; padding: 9pt 11pt;
+        font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+        white-space: pre-wrap; margin: 8pt 0; page-break-inside: avoid; }
+  pre tt { background:none; color:inherit; padding:0; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; font-size: 9.5pt; }
+  th { background:#eef2fb; color:#1f2430; text-align:left; padding:5pt 8pt;
+       border:1px solid #d7dbe2; }
+  td { padding:5pt 8pt; border:1px solid #d7dbe2; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .cover { text-align:center; margin-top: 40mm; }
+  .cover .sub { color:#6b7280; font-size: 12pt; margin-top: 14pt; }
+  .cover .tools { margin-top: 26pt; font-size: 11pt; }
+  .toc { background:#f6f7f9; border:1px solid #e5e7eb; border-radius:6px;
+         padding: 10pt 16pt; margin: 14pt 0; }
+  .toc ul { list-style: none; padding-left: 4pt; }
+  .toc li { margin: 2pt 0; }
+  .a { background:none; }
+  .note { background:#fff8e6; border-left:4px solid #f29900; border-radius:4px;
+          padding: 8pt 11pt; margin: 10pt 0; }
+  .tip { background:#e9f5ec; border-left:4px solid #188038; border-radius:4px;
+         padding: 8pt 11pt; margin: 10pt 0; }
+  .warn { background:#fdeceb; border-left:4px solid #d93025; border-radius:4px;
+         padding: 8pt 11pt; margin: 10pt 0; }
+  .filelist td:first-child { font-family: Consolas, monospace; font-size: 9pt;
+                             white-space: nowrap; }
+  footer { margin-top: 20pt; color:#9aa0a6; font-size: 8.5pt; text-align:center; }
+  .small { font-size: 9pt; color:#6b7280; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover">
+  <h1>chrome_tab_organiser</h1>
+  <div class="sub">User Guide</div>
+  <div class="tools">
+    <b>chrome_report&nbsp;(latest: chrome_report_v1.1.py)</b><br>
+    &mdash; generate HTML (and JSON) reports of your open Chrome tabs, organised by tab group<br><br>
+    <b>chrome_report_edit&nbsp;(latest: chrome_report_edit_v1.3.py)</b><br>
+    &mdash; a local web app to edit those reports (rename windows, groups &amp; tabs, insert / delete
+    rows, sort groups alphabetically, save under a new name)
+  </div>
+  <p class="small">Self-contained tools &mdash; Python standard library only, no dependencies to install.</p>
+</div>
+
+<!-- ============================ TOC ============================ -->
+<div class="toc">
+  <b>Contents</b>
+  <ul>
+    <li>1&nbsp;&nbsp;Overview &amp; workflow</li>
+    <li>2&nbsp;&nbsp;chrome_report (latest version: chrome_report_v1.1.py)
+      <ul>
+        <li>2.1&nbsp;&nbsp;What it does</li>
+        <li>2.2&nbsp;&nbsp;Usage &amp; options</li>
+        <li>2.3&nbsp;&nbsp;Output files</li>
+        <li>2.4&nbsp;&nbsp;How it works</li>
+        <li>2.5&nbsp;&nbsp;Notes &amp; troubleshooting</li>
+      </ul>
+    </li>
+    <li>3&nbsp;&nbsp;chrome_report_edit (latest version: chrome_report_edit_v1.3.py)
+      <ul>
+        <li>3.1&nbsp;&nbsp;What it does</li>
+        <li>3.2&nbsp;&nbsp;Startup &amp; options</li>
+        <li>3.3&nbsp;&nbsp;Editing capabilities</li>
+        <li>3.4&nbsp;&nbsp;Sorting tab groups alphabetically</li>
+        <li>3.5&nbsp;&nbsp;Saving</li>
+        <li>3.6&nbsp;&nbsp;Safety &amp; notes</li>
+      </ul>
+    </li>
+    <li>4&nbsp;&nbsp;Typical workflow</li>
+    <li>5&nbsp;&nbsp;Troubleshooting &amp; FAQ</li>
+  </ul>
+</div>
+
+<!-- ============================ 1. OVERVIEW ============================ -->
+<h2>1&nbsp;&nbsp;Overview &amp; workflow</h2>
+<p>These two tools work together as a small tab organiser for Chrome:
+<code>chrome_report</code> turns your currently open Chrome windows and tabs into a
+self-contained HTML report (and optionally JSON), and <code>chrome_report_edit</code>
+lets you polish that report by renaming windows, groups and tabs, editing or deleting
+entries, inserting new entries, sorting tab groups alphabetically, and saving the result
+under a name you choose.</p>
+<p>Both tools are single Python files using only the standard library. They run on
+Windows, macOS and Linux, require no <i>pip install</i>, and never talk to any external
+service. They read Chrome&rsquo;s own session data directly from disk, so Chrome itself does
+not need to be closed &mdash; it can keep running while you generate a report.</p>
+<p><b>Pre-built executables are also included:</b> <code>chrome_report_v1.1.exe</code> and
+<code>chrome_report_edit_v1.3.exe</code> in the same folder are these two tools packaged as
+self-contained Windows programs &mdash; same options, same behaviour, and <b>no Python install
+required</b>. Everything in this guide applies to both the <code>.py</code> and <code>.exe</code> forms;
+where a Python command is shown, simply use the executable&rsquo;s file name instead.</p>
+<div class="tip"><b>Typical flow</b><br>
+1. <code>python chrome_report_v1.1.py --json --outdir reports</code> &rarr; create the report(s).<br>
+2. <code>python chrome_report_edit_v1.3.py --dir reports</code> &rarr; open the editor in your browser.<br>
+3. Edit, then <b>Save as</b> a new name, e.g. <code>final_2026.html</code>.</div>
+
+<!-- ============================ 2. chrome_report ============================ -->
+<h2>2&nbsp;&nbsp;chrome_report <span style="font-size:10pt;color:#6b7280">(latest version: chrome_report_v1.1.py)</span></h2>
+
+<h3>2.1&nbsp;&nbsp;What it does</h3>
+<p><code>chrome_report_v1.1.py</code> reads one Chrome profile &mdash; the
+<b>Default</b> profile &mdash; and produces a report of every window it finds.
+For each window it lists every tab in three columns:
+<b>Group</b> (the tab group the tab belongs to, left blank when ungrouped),
+<b>Tab</b> (the page title, clickable), and <b>URL</b> (clickable). Tab groups
+appear as colour-coded chips that match the colours you see in Chrome.</p>
+<p>Windows are simply named <b>Window 1, Window 2, &hellip; Window N</b>
+(numbered per report). Each window block shows how many tabs (and groups) it
+contains; the active window and the active tab are marked with a star.</p>
+
+<h3>2.2&nbsp;&nbsp;Usage &amp; options</h3>
+<pre>python chrome_report_v1.1.py [--data-dir PATH] [--outdir PATH] [--json]</pre>
+<table>
+  <tr><th style="width:34%">Option</th><th>Meaning</th></tr>
+  <tr><td><code>(none)</code></td><td>Uses the Default profile, auto-detects the Chrome data
+      directory, and writes the HTML report into the current folder.</td></tr>
+  <tr><td><code>--data-dir PATH</code></td><td>Chrome profile data directory instead of auto-detect.
+      Auto-detect looks here:
+      <ul>
+        <li>Windows &mdash; <code>%LOCALAPPDATA%\Google\Chrome\User Data</code></li>
+        <li>macOS &mdash; <code>~/Library/Application Support/Google/Chrome</code></li>
+        <li>Linux &mdash; <code>~/.config/google-chrome</code></li>
+      </ul></td></tr>
+  <tr><td><code>--outdir PATH</code></td><td>Directory for the output file(s). Created if missing.
+      Default: current directory.</td></tr>
+  <tr><td><code>--json</code></td><td>Additionally write the parsed data as a JSON file
+      (see 2.3).</td></tr>
+</table>
+<p class="small">No Python installed? Run <code>chrome_report_v1.1.exe</code> instead &mdash; the
+options are identical, and the report is written to <code>--outdir</code> (default: the folder you run it from).</p>
+
+<h3>2.3&nbsp;&nbsp;Output files</h3>
+<p>Written into <code>--outdir</code>:</p>
+<table class="filelist">
+  <tr><th style="width:46%">File</th><th>Contents</th></tr>
+  <tr><td>chrome_tabs_Default_v1.1.html</td><td>Self-contained report: inline CSS, all styling
+      embedded, links open in your default browser. Safe to share or keep as a personal archive.</td></tr>
+  <tr><td>chrome_tabs_Default_v1.1.json</td><td>(only with <code>--json</code>) Machine-readable
+      data: <code>profile</code>, <code>files</code> (source session files), <code>groups</code>,
+      and <code>windows[]</code>, each window with <code>id</code>, <code>name</code>,
+      <code>active</code> and <code>tabs[]</code> (url, title, group, color, active).</td></tr>
+</table>
+
+<h3>2.4&nbsp;&nbsp;How it works</h3>
+<p>Chrome continuously saves its &ldquo;session&rdquo; to binary files inside
+<code>&lt;data dir&gt;\&lt;profile&gt;\Sessions\</code> (files such as
+<code>Session_&hellip;</code> and <code>Tabs_&hellip;</code>). The script parses this
+SNSS format directly &mdash; including tab-group membership and group names/colours &mdash;
+so no Chrome window, extension or automation API is required. Files that are
+mid-write are retried a few times; anything still locked is skipped with a warning
+(see 2.5). The report contains the most recent complete snapshot that was readable.</p>
+<p>The script reads only the <b>Default</b> profile. Earlier versions
+(<code>chrome_report_v1.py</code>, <code>chrome_report.py</code>) supported other profiles;
+this latest version intentionally focuses on Default so its output filenames are fixed and
+predictable (no <code>--profile</code> flag).</p>
+
+<h3>2.5&nbsp;&nbsp;Notes &amp; troubleshooting</h3>
+<ul>
+  <li><b>Chrome can keep running</b> while you generate the report; nothing is closed or
+      modified. Chrome only needs its session files on disk (it writes them constantly while running).</li>
+  <li><span class="small"><code>warning: skipped (&hellip;, in use by Chrome)</code></span> &mdash; the newest
+      session file was being written at that exact moment. The report still contains the
+      previous complete snapshot; wait a few seconds and re-run for the very latest state.</li>
+  <li>Duplicate group names across Chrome restarts are counted <b>once</b> (groups are
+      identified by name and value), so the group totals stay accurate.</li>
+  <li>If no windows/tabs are found, double-check you are running the script on the machine
+      where that Chrome profile lives (session files are local to it).</li>
+</ul>
+
+<!-- ============================ 3. chrome_report_edit ============================ -->
+<h2>3&nbsp;&nbsp;chrome_report_edit <span style="font-size:10pt;color:#6b7280">(latest version: chrome_report_edit_v1.3.py)</span></h2>
+
+<h3>3.1&nbsp;&nbsp;What it does</h3>
+<p><code>chrome_report_edit_v1.3.py</code> is a small local web app for editing a generated
+HTML report. It starts a <b>localhost-only</b> web server, opens the editor in your
+browser, and lets you make changes that are written back to disk when you save. The
+report is shown exactly as it will look (inside a preview pane that keeps the report&rsquo;s
+own styling), and statistics &mdash; windows &middot; tabs &middot; groups &mdash; update as you edit.</p>
+
+<h3>3.2&nbsp;&nbsp;Startup &amp; options</h3>
+<pre>python chrome_report_edit_v1.3.py [--dir PATH] [--port 8765] [--host 127.0.0.1] [--no-browser]</pre>
+<table>
+  <tr><th style="width:38%">Option</th><th>Meaning</th></tr>
+  <tr><td><code>(none)</code></td><td>Serves the reports in the script&rsquo;s own folder and opens the browser automatically.</td></tr>
+  <tr><td><code>--dir PATH</code></td><td>Directory whose <code>*.html</code> files the editor manages (and where saved files are written). Default: the script&rsquo;s folder.</td></tr>
+  <tr><td><code>--port N</code></td><td>Port for the local server. Default <code>8765</code>.</td></tr>
+  <tr><td><code>--host ADDR</code></td><td>Bind address. Default <code>127.0.0.1</code> (loopback only).</td></tr>
+  <tr><td><code>--no-browser</code></td><td>Do not auto-open the browser; the URL is printed instead.</td></tr>
+</table>
+<p class="small">No Python installed? Run <code>chrome_report_edit_v1.3.exe</code> instead &mdash;
+same options, and without <code>--dir</code> it manages the folder the exe is in.</p>
+<p>After starting, a browser tab opens at <code>http://127.0.0.1:8765/</code>. To edit a report
+you either (a) pick it from the <b>dropdown</b> at the top and click <b>Load</b>, or (b) click
+<b>Open&hellip;</b> to load any <code>.html</code> file from anywhere. Press <code>Ctrl+C</code> in the
+terminal to stop the server.</p>
+
+<h3>3.3&nbsp;&nbsp;Editing capabilities</h3>
+<ol>
+  <li><b>Change the window names.</b> Click any &ldquo;Window N&rdquo; heading and type a new name.
+      The new name is used in the window header and in the insert-dialog&rsquo;s window list.</li>
+  <li><b>Delete entries.</b> Each table row has a <b>&times;</b> button; clicking it removes that tab.
+      The window&rsquo;s tab/group count and the report&rsquo;s header statistics are recomputed immediately.
+      (Tip: <code>Ctrl+Backspace</code> while a row is focused also deletes it.)</li>
+  <li><b>Insert a new entry.</b> Click <b>Add tab</b> (in a window header, appends at the end) or the
+      <b>+</b> button on a specific row (inserts after that row). A dialog then asks for:
+      <ul>
+        <li><b>Window</b> &mdash; which window receives the tab (drop-down, defaults to the current one);</li>
+        <li><b>Position</b> &mdash; at the top, after a specific row, or at the end;</li>
+        <li><b>Group</b> (optional) &mdash; pick from existing group names (auto-suggested, colour reused) or type a new one;</li>
+        <li><b>Tab name</b> and <b>URL</b>.</li>
+      </ul>
+      The new row is added using the report&rsquo;s exact markup, so it is indistinguishable from
+      generated rows in the saved file.</li>
+  <li><b>Sort groups alphabetically.</b> A tick-box in the toolbar rearranges the current report
+      (see 3.4 for the exact behaviour).</li>
+  <li><b>Save the modified report under a user-defined name.</b> Type the file name in the toolbar
+      (or keep the current one) and press <b>Save</b> (or <kbd>Enter</kbd>). The file is written
+      into the managed directory and the dropdown refreshes to list it.</li>
+</ol>
+<p><b>In place edits on existing rows (extra):</b> besides deleting and inserting, you can click any
+row&rsquo;s group chip, tab title or URL and edit the text directly. Editing a URL also updates the
+link&rsquo;s <code>href</code> and tooltip. Clearing a group name ungroups the tab; typing one adds it with
+a default colour.</p>
+
+<h3>3.4&nbsp;&nbsp;Sorting tab groups alphabetically</h3>
+<p>The toolbar&rsquo;s <b>&ldquo;sort groups alphabetically&rdquo;</b> check-box only affects the
+<em>current</em> report and only when you tick it:</p>
+<ul>
+  <li><b>Tick the box</b> &rarr; within each window, tab rows are rearranged so that rows
+      <em>without</em> a group come first (keeping their existing order), then tab groups in
+      alphabetical order. Group names are compared case-insensitively &mdash; &ldquo;ChIP&rdquo; and
+      &ldquo;chip&rdquo; are treated as the same name and stay together. Sorting happens
+      <em>within each window only</em>, so the order of windows never changes.</li>
+  <li><b>Untick the box</b> &rarr; the previous order is restored exactly (including any edits you
+      made in the meantime).</li>
+  <li><b>No automatic reordering.</b> Reports always load in their original order, and the box is
+      reset to unticked every time you load or open a report &mdash; nothing is ever reordered unless
+      you tick the box yourself. Ticking it is always an explicit action on the current document.</li>
+  <li><b>Inserting a tab while sorted</b> adds the row exactly where the dialog places it; it is not
+      moved again. Tick and untick the box (or re-tick) to re-apply the alphabetical order.</li>
+</ul>
+<div class="note"><b>The sort is limited to the current document.</b> The sort only rearranges the preview;
+the on-disk file changes only when you press <b>Save</b>, and save writes the order you currently see
+(sorted if the box is ticked, original otherwise). Tick, then Save, to keep a sorted copy.</div>
+
+<h3>3.5&nbsp;&nbsp;Saving</h3>
+<ul>
+  <li>Nothing is written to disk until you press <b>Save</b>; loading or editing alone changes
+      nothing on disk.</li>
+  <li>The name must be a simple <code>*.html</code> file name (no paths, no slashes). The server
+      validates this and always writes inside the managed directory &mdash; traversal attempts
+      (<code>..\</code>, absolute paths) are rejected.</li>
+  <li>On success the status bar shows the full path and byte count of the saved file, and it appears in
+      the file dropdown. The browser may prompt before closing the tab if you have unsaved edits.</li>
+</ul>
+
+<h3>3.6&nbsp;&nbsp;Safety &amp; notes</h3>
+<ul>
+  <li>The server binds to <code>127.0.0.1</code> by default and is intended for local use only.</li>
+  <li>Only <code>*.html</code> files are listed/loaded/saved; query strings and names are validated,
+      so the tool cannot read or write anything outside <code>--dir</code>.</li>
+  <li>The preview pane is sandboxed (scripts allowed, navigation blocked), so clicking a link in the
+      report will not navigate the editor away.</li>
+  <li>Loading an edited report back in the editor works the same way as the original &mdash; you can edit
+      your saved revisions repeatedly.</li>
+</ul>
+
+<!-- ============================ 4. WORKFLOW ============================ -->
+<h2>4&nbsp;&nbsp;Typical workflow</h2>
+<pre># 1) Generate the report for the Default profile, with JSON, into ./reports
+python chrome_report_v1.1.py --json --outdir reports
+
+# 2) Open the editor pointed at that folder (browser opens automatically)
+python chrome_report_edit_v1.3.py --dir reports
+
+# 3) In the browser: Load chrome_tabs_Default_v1.1.html
+#    - click "Window 3" heading, type "Hi-C"
+#    - remove a few stale rows with  x
+#    - use + next to a row to insert a new tab (ChIP / bioRxiv / URL)
+#    - tick "sort groups alphabetically" to re-arrange groups A-Z,
+#      untick to restore; after each change the tab/group counts update
+
+# 4) Type "final_2026.html" in the name box and press Save
+#    -> reports/final_2026.html is written and listed
+
+# 5) Open the saved file (or keep editing it in the editor)
+start reports\final_2026.html</pre>
+
+<!-- ============================ 5. TROUBLESHOOTING ============================ -->
+<h2>5&nbsp;&nbsp;Troubleshooting &amp; FAQ</h2>
+<table>
+  <tr><th style="width:38%">Symptom / question</th><th>Answer</th></tr>
+  <tr><td>Script prints &ldquo;warning: skipped (&hellip;, in use by Chrome)&rdquo;</td>
+      <td>Chrome was writing its newest session file at that moment. The report still shows the previous
+          complete snapshot. Wait a few seconds and re-run <code>chrome_report_v1.1.py</code>.</td></tr>
+  <tr><td>&ldquo;Default profile not found&rdquo;</td><td>The script could not find a <code>Preferences</code>
+      file under <code>&lt;data dir&gt;\Default</code>. Point <code>--data-dir</code> at the right
+      &ldquo;User Data&rdquo; directory, or run on the machine that uses this Chrome profile.</td></tr>
+  <tr><td>No reports in the editor dropdown</td><td>The dropdown lists <code>*.html</code> files in
+      <code>--dir</code> only. Start the editor with the folder that contains your report
+      (e.g. <code>--dir reports</code>), or use <b>Open&hellip;</b> to load any file.</td></tr>
+  <tr><td>&ldquo;Address already in use&rdquo; when starting the editor</td>
+      <td>Another process (or an earlier editor instance) uses port 8765. Run
+      <code>python chrome_report_edit_v1.3.py --port 9000</code> (any free port).</td></tr>
+  <tr><td>A report looks reordered without me doing anything</td>
+      <td>It should not be: loading always shows the report&rsquo;s original order and the sort box resets to
+          unticked on every load. If you see a sorted-looking report, the file itself was already saved
+          that way &mdash; untick/restore only applies to the current session&rsquo;s view.</td></tr>
+  <tr><td>Can I edit reports generated for other profiles?</td>
+      <td>Yes &mdash; the editor works on any report in this HTML format. Only the <i>generator</i>
+      (<code>chrome_report_v1.1.py</code>) is restricted to the Default profile. Older generators
+      (<code>chrome_report_v1.py</code>, <code>chrome_report.py</code>) can produce reports for other
+      profiles, which the editor can then load and edit.</td></tr>
+  <tr><td>Are the tools safe to run? Do they install anything?</td><td>Yes &mdash; standard library only,
+      nothing is installed, no network access required, nothing is modified on disk except via an
+      explicit &ldquo;Save&rdquo; in the editor.</td></tr>
+  <tr><td>Must Chrome be closed to generate a report?</td><td>No. Reports are read from the session
+      files Chrome writes continuously while running. If a file is mid-write it is skipped with a
+      warning and reported as a re-run hint.</td></tr>
+</table>
+
+<footer>chrome_tab_organiser &mdash; chrome_report_v1.1.py &middot; chrome_report_edit_v1.3.py (Python 3, no external dependencies)</footer>
+
+</body>
+</html>

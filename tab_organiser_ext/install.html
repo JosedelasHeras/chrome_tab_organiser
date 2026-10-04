@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install the Tab Organiser extension</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#ffffff; --ink:#1f2430; --mut:#6b7280;
+    --line:#e5e7eb; --accent:#1a73e8; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Segoe UI", system-ui, Arial, sans-serif;
+    background:var(--bg); color:var(--ink); }
+  header { background:var(--card); border-bottom:1px solid var(--line);
+    padding:24px 32px; }
+  h1 { margin:0 0 6px; font-size:22px; }
+  .meta { color:var(--mut); font-size:13px; }
+  main { padding:24px 32px; max-width:900px; }
+  section { background:var(--card); border:1px solid var(--line);
+    border-radius:8px; padding:16px 20px; margin-bottom:18px; }
+  h2 { font-size:16px; margin:0 0 10px; }
+  h3 { font-size:14px; margin:16px 0 6px; }
+  ol { margin:0; padding-left:22px; }
+  li { margin-bottom:10px; }
+  code, kbd { font-family:Consolas, "Courier New", monospace; font-size:13px;
+    background:#f1f3f4; border:1px solid var(--line); border-radius:4px;
+    padding:1px 5px; }
+  .copyrow { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-top:8px; }
+  .btn { font:inherit; font-size:13px; padding:6px 14px; cursor:pointer;
+    border:1px solid var(--line); border-radius:6px; background:var(--card);
+    color:var(--ink); }
+  .btn:hover { border-color:var(--accent); color:var(--accent); }
+  .note { color:var(--mut); font-size:12px; }
+  a { color:var(--accent); }
+  footer { color:var(--mut); font-size:12px; padding:0 32px 32px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Install the Tab Organiser extension</h1>
+  <div class="meta">Adds the <b>Open &hellip; in Chrome</b> buttons to
+  <code>chrome_report_v1.4.html</code> reports &mdash; for windows and for single
+  tab groups.</div>
+</header>
+
+<main>
+  <section>
+    <h2>What it does</h2>
+    <p>Report pages can always open a window or a group in a second
+    <i>browser</i> window; that needs nothing extra. The extension is what turns
+    those into <b>real Chrome windows containing real Chrome tab groups</b>,
+    with each group's title and colour preserved.</p>
+    <p class="note">It only ever creates new tabs. It never moves, closes or
+    reorders anything in your existing windows.</p>
+  </section>
+
+  <section>
+    <h2>Install (once)</h2>
+    <ol>
+      <li>Open <code>chrome://extensions</code> in Chrome.</li>
+      <li>Switch on <b>Developer mode</b> (top right of that page).</li>
+      <li>Click <b>Load unpacked</b> and pick the
+        <code>tab_organiser_ext</code> folder &mdash; the one containing
+        <code>manifest.json</code>.</li>
+      <li>Open the extension's <b>Details</b> page and switch on
+        <b>Allow access to file URLs</b>. Reports are opened as
+        <code>file://</code> pages, so without this the extension cannot see
+        them.</li>
+    </ol>
+    <h3>Chrome will not let this page link straight to chrome://extensions</h3>
+    <p class="note">Chrome blocks navigation to <code>chrome://</code> URLs from
+    web and <code>file://</code> pages, so a link here would do nothing. Type or
+    paste the address below instead.</p>
+    <div class="copyrow">
+      <code id="ext-url">chrome://extensions</code>
+      <button class="btn" id="copy">Copy</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Check it works</h2>
+    <ol>
+      <li>Reopen the report. The badge at the top right of the report turns
+        green and reads <i>extension connected</i>. Until then the Chrome-side
+        buttons stay disabled; the plain grouped popups keep working.</li>
+      <li>Open <a href="selftest.html">selftest.html</a> from this folder. It
+        runs a handful of real API calls and prints PASS or FAIL for each.</li>
+    </ol>
+    <p class="note">The self-test opens a few <code>example.com</code> tabs in
+    new windows; close them when you are done. It does not touch your existing
+    windows.</p>
+  </section>
+
+  <section>
+    <h2>Permissions, and why</h2>
+    <ul>
+      <li><code>tabs</code>, <code>tabGroups</code>, <code>windows</code> &mdash;
+        read and create tabs, create groups with their titles and colours, and
+        create the target windows.</li>
+      <li>Host access to <code>file:///*</code>, <code>localhost</code> and
+        <code>127.0.0.1</code> &mdash; report pages only.</li>
+    </ul>
+    <p class="note">No network access, no storage, no background script, no
+    telemetry.</p>
+  </section>
+</main>
+
+<footer>
+  tab_organiser_ext &middot; full notes in README.md
+</footer>
+
+<script>
+(function () {
+  var button = document.getElementById('copy');
+  var value = document.getElementById('ext-url').textContent;
+  button.addEventListener('click', function () {
+    function done(ok) {
+      button.textContent = ok ? 'Copied' : 'Copy failed - select it manually';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(function () { done(true); },
+        function () { done(false); });
+      return;
+    }
+    var field = document.createElement('textarea');
+    field.value = value;
+    document.body.appendChild(field);
+    field.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    document.body.removeChild(field);
+    done(ok);
+  });
+})();
+</script>
+</body>
+</html>

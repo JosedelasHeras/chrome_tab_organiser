@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chrome_tab_organiser — v1.4 Editor Update</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif; color:#20242e;
+         font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; }
+  h2 { font-size: 15pt; color:#1663c5; border-bottom: 2px solid #1663c5;
+       padding-bottom: 4pt; margin: 22pt 0 10pt; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 14pt 0 6pt; color:#1f2430; page-break-after: avoid; }
+  p { margin: 6pt 0; }
+  ul, ol { margin: 6pt 0; padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  tt, code { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+             background:#eef1f6; border-radius: 3px; padding: 0 3px; color:#0b3d91; }
+  pre { background:#1f2430; color:#e8ecf3; border-radius: 6px; padding: 9pt 11pt;
+        font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+        white-space: pre-wrap; margin: 8pt 0; page-break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; font-size: 9.5pt; }
+  th { background:#eef2fb; color:#1f2430; text-align:left; padding:5pt 8pt;
+       border:1px solid #d7dbe2; }
+  td { padding:5pt 8pt; border:1px solid #d7dbe2; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .cover { text-align:center; margin-top: 40mm; }
+  .cover .sub { color:#6b7280; font-size: 12pt; margin-top: 14pt; }
+  .cover .tools { margin-top: 26pt; font-size: 11pt; }
+  .toc { background:#f6f7f9; border:1px solid #e5e7eb; border-radius:6px;
+         padding: 10pt 16pt; margin: 14pt 0; }
+  .toc ul { list-style: none; padding-left: 4pt; }
+  .toc li { margin: 2pt 0; }
+  .note { background:#fff8e6; border-left:4px solid #f29900; border-radius:4px;
+          padding: 8pt 11pt; margin: 10pt 0; }
+  .tip { background:#e9f5ec; border-left:4px solid #188038; border-radius:4px;
+         padding: 8pt 11pt; margin: 10pt 0; }
+  .warn { background:#fdeceb; border-left:4px solid #d93025; border-radius:4px;
+          padding: 8pt 11pt; margin: 10pt 0; }
+  .new { background:#e8f0fe; border-left:4px solid #1a73e8; border-radius:4px;
+         padding: 8pt 11pt; margin: 10pt 0; }
+  .filelist td:first-child { font-family: Consolas, monospace; font-size: 9pt;
+                             white-space: nowrap; }
+  .rowdemo { background:#f6f7f9; border:1px dashed #b9bfc9; border-radius:6px;
+             padding:10pt 12pt; margin:10pt 0; font-size:9.5pt; }
+  .rowdemo table { margin: 0; font-size: 9pt; }
+  .rowdemo td, .rowdemo th { border:1px solid #d7dbe2; }
+  .grip { background:#1a73e8; color:#fff; border-radius:3px; padding:0 4px;
+          font-weight:700; }
+  footer { margin-top: 20pt; color:#9aa0a6; font-size: 8.5pt; text-align:center; }
+  .small { font-size: 9pt; color:#6b7280; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover">
+  <h1>chrome_tab_organiser</h1>
+  <div class="sub">v1.4 Editor Update — Drag to Reorder Tabs</div>
+  <div class="tools">
+    <b>chrome_report_edit_v1.4.py</b><br>
+    &mdash; a local web app to edit generated tab reports<br>
+    &mdash; <b>new:</b> drag tabs up, down, or across into another window<br><br>
+    <b>chrome_report_v1.4.py</b><br>
+    &mdash; generate the HTML/JSON report this editor reads
+  </div>
+  <p class="small">Document suffix <tt>_261004</tt> &mdash; self-contained tools, Python standard library only.</p>
+</div>
+
+<!-- ============================ TOC ============================ -->
+<div class="toc">
+  <b>Contents</b>
+  <ul>
+    <li>1&nbsp;&nbsp;What is new in v1.4</li>
+    <li>2&nbsp;&nbsp;Files</li>
+    <li>3&nbsp;&nbsp;Running the editor</li>
+    <li>4&nbsp;&nbsp;Reordering tabs &mdash; the new part</li>
+    <li>5&nbsp;&nbsp;Interaction with &ldquo;sort groups alphabetically&rdquo;</li>
+    <li>6&nbsp;&nbsp;Row positions (<tt>data-pos</tt>)</li>
+    <li>7&nbsp;&nbsp;Saving</li>
+    <li>8&nbsp;&nbsp;Testing</li>
+    <li>9&nbsp;&nbsp;Troubleshooting</li>
+    <li>10&nbsp;&nbsp;Relationship to the report generator</li>
+  </ul>
+</div>
+
+<!-- ============================ 1 ============================ -->
+<h2>1&nbsp;&nbsp;What is new in v1.4</h2>
+
+<div class="new">
+  Version 1.4 of the report editor adds <b>drag-and-drop reordering of tabs</b>:
+  grab the <b>&#10215; grip</b> on any tab row and drag it <b>up or down</b> to
+  change its position inside the window, or <b>into any other window</b> to move
+  that tab between windows. Row positions (<tt>data-pos</tt>) are renumbered
+  automatically after every change.
+</div>
+
+<ul>
+  <li>The dragged row is dimmed while in flight; the target table is outlined.</li>
+  <li>Everything from v1.3 still works: renaming windows and groups, editing tab
+      titles and URLs, inserting rows, deleting rows, alphabetical group sorting,
+      and saving under a new name.</li>
+</ul>
+
+<!-- ============================ 2 ============================ -->
+<h2>2&nbsp;&nbsp;Files</h2>
+<table class="filelist">
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td>chrome_report_edit_v1.4.py</td><td>The editor. Run this.</td></tr>
+  <tr><td>chrome_report_edit_v1.4.exe</td><td>Standalone editor, no Python needed.</td></tr>
+  <tr><td>chrome_report_edit_v1.3.py</td><td>Previous editor, kept for reference. Unchanged.</td></tr>
+  <tr><td>chrome_tabs_Default_v1.4.html</td><td>Example report from the v1.4 generator.</td></tr>
+  <tr><td>test_editor_js.py</td><td>Headless test suite for the editor (25 checks).</td></tr>
+</table>
+<p class="small">Older versions (<tt>chrome_report_edit.py</tt>,
+<tt>_v1.1.py</tt>, <tt>_v1.2.py</tt>, <tt>_v1.3.py</tt>) are untouched, as is the
+existing <tt>chrome_tab_organiser_guide_260911</tt> series.</p>
+
+<!-- ============================ 3 ============================ -->
+<h2>3&nbsp;&nbsp;Running the editor</h2>
+
+<h3>From Python</h3>
+<pre>python chrome_report_edit_v1.4.py</pre>
+
+<h3>From the executable</h3>
+<p>Double-click <tt>chrome_report_edit_v1.4.exe</tt>. On first run Windows may show
+a SmartScreen prompt &mdash; choose <b>More info &rarr; Run anyway</b>.</p>
+
+<h3>Options</h3>
+<table>
+  <tr><th>Option</th><th>Meaning</th></tr>
+  <tr><td><tt>--dir PATH</tt></td><td>directory of reports to manage (default: the editor's own directory)</td></tr>
+  <tr><td><tt>--host HOST</tt></td><td>default <tt>127.0.0.1</tt></td></tr>
+  <tr><td><tt>--port PORT</tt></td><td>default <tt>8765</tt></td></tr>
+  <tr><td><tt>--no-browser</tt></td><td>do not open a browser window at startup</td></tr>
+</table>
+<p>The editor starts a small local web server and opens
+<tt>http://127.0.0.1:8765/</tt>. It binds to the loopback address unless you pass
+a different <tt>--host</tt>.</p>
+
+<div class="tip">
+  The <tt>.exe</tt> manages the directory it lives in. Point it elsewhere with
+  <tt>chrome_report_edit_v1.4.exe --dir "D:\path\to\reports"</tt>.
+</div>
+
+<!-- ============================ 4 ============================ -->
+<h2>4&nbsp;&nbsp;Reordering tabs &mdash; the new part</h2>
+
+<h3>Starting a drag</h3>
+<p>Press and hold the <b>&#10215; grip</b> in the Group cell of a row, then move
+the mouse. The grip turns to a grabbing cursor; the row dims to 40% opacity.</p>
+
+<div class="rowdemo">
+<table>
+  <tr><th>Group</th><th>Tab</th><th>URL</th></tr>
+  <tr>
+    <td><span class="grip">&#10215;</span> + &times;
+        <span class="chip" style="background:#1a73e8;color:#fff;padding:1px 5px;border-radius:3px;">ChIP</span></td>
+    <td>Alpha</td><td>https://a.example/</td>
+  </tr>
+  <tr><td colspan="3" class="small">&larr; press and hold the grip, then drag</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <b>The drag starts only from the grip.</b> Clicking anywhere else in a row keeps
+  its normal behaviour &mdash; clicking text edits it, clicking a link does not
+  follow it. That is why rows stay comfortable to edit by hand even with dragging
+  enabled.
+</div>
+
+<h3>Dropping</h3>
+<table>
+  <tr><th>Drop point</th><th>Result</th></tr>
+  <tr><td>Above a row's midpoint</td><td>Inserted <b>before</b> that row</td></tr>
+  <tr><td>Below a row's midpoint</td><td>Inserted <b>after</b> that row</td></tr>
+  <tr><td>Past the last row</td><td>Inserted at the <b>end</b></td></tr>
+  <tr><td>Over another window's table</td><td>Inserted into <b>that window</b></td></tr>
+</table>
+<p>The insertion slot only changes when the pointer crosses a row's midpoint, so
+the row settles in place instead of jittering as you move the mouse. Release the
+mouse button to commit; releasing outside the tables cancels.</p>
+
+<p class="small">No keyboard shortcut is provided in v1.4 &mdash; reordering is
+mouse-only. Everything else in the editor is unchanged.</p>
+
+<!-- ============================ 5 ============================ -->
+<h2>5&nbsp;&nbsp;Interaction with &ldquo;sort groups alphabetically&rdquo;</h2>
+<p>The toolbar checkbox reorders every window so that ungrouped tabs come first,
+then tab groups A&rarr;Z. It is a <b>view-level</b> reordering that is undone when
+you uncheck it.</p>
+
+<div class="new">
+  <b>Starting a drag turns the checkbox off automatically.</b> The order you see
+  at that moment becomes the new baseline, and your drag is applied to it.
+  Unchecking afterwards will no longer snap the rows back, because there is
+  nothing left to restore.
+</div>
+
+<p>If you prefer to use sorting as a one-off view it is safe: as long as you do
+not drag while it is checked, unchecking restores the original order.</p>
+
+<!-- ============================ 6 ============================ -->
+<h2>6&nbsp;&nbsp;Row positions (<tt>data-pos</tt>)</h2>
+<p>Reports from <tt>chrome_report_v1.4.py</tt> tag each row with
+<tt>data-pos="1"</tt>, <tt>"2"</tt>, &hellip; in display order. Several parts of
+the report rely on that numbering matching the row order, so the editor keeps it
+truthful:</p>
+<ul>
+  <li><tt>data-pos</tt> is rewritten <tt>1..N</tt> after an <b>insert</b>, a
+      <b>delete</b>, a <b>drag</b>, a <b>group sort</b>, and on <b>save</b>.</li>
+  <li>A dragged row keeps its attribute while in flight; the two windows involved
+      are renumbered together when the drop completes.</li>
+  <li>Reports with <b>no</b> <tt>data-pos</tt> anywhere (older v1.3-era and
+      earlier reports) are left that way. Editing such a report never silently
+      adds the attribute, so a round-trip cannot change its shape.</li>
+</ul>
+
+<!-- ============================ 7 ============================ -->
+<h2>7&nbsp;&nbsp;Saving</h2>
+<p>Click <b>Save</b>, or press <tt>Enter</tt> in the name box. Type a name to write
+a new file; leave it as-is to overwrite the file you loaded. Only simple
+<tt>[A-Za-z0-9_-. ]</tt> names ending in <tt>.html</tt> are accepted, and writes
+are confined to the managed directory.</p>
+
+<div class="tip">
+  Saved reports contain <b>no editor chrome</b> &mdash; the grip, the
+  <tt>+</tt>/<tt>&times;</tt> buttons, the injected stylesheet and all
+  <tt>contenteditable</tt> attributes are stripped automatically. A saved file is
+  a clean report you can open in any browser.
+</div>
+
+<!-- ============================ 8 ============================ -->
+<h2>8&nbsp;&nbsp;Testing</h2>
+<pre>python -m py_compile chrome_report_edit_v1.4.py test_editor_js.py
+python test_editor_js.py</pre>
+<p><tt>test_editor_js.py</tt> drives the real editor page in headless Chrome with
+synthetic drag events and asserts 25 behaviours:</p>
+<ul>
+  <li>a grip on every row, carrying <tt>ce-inject</tt> so it is stripped on save</li>
+  <li>dragging down within a window reorders the rows</li>
+  <li>dragging across windows moves the tab and both windows stay sequential</li>
+  <li><tt>data-pos</tt> is renumbered after insert, delete and drag</li>
+  <li>the drag clears its own classes and the drop-zone highlight</li>
+  <li>a drag unchecks the group-sort box</li>
+  <li>saving strips the grip, the injected CSS and <tt>contenteditable</tt>, and
+      keeps <tt>data-pos</tt></li>
+  <li>a legacy report without <tt>data-pos</tt> gains no attributes through any of it</li>
+</ul>
+<p class="small">Requires Google Chrome; <tt>Node.js</tt> is <b>not</b> required.</p>
+
+<!-- ============================ 9 ============================ -->
+<h2>9&nbsp;&nbsp;Troubleshooting</h2>
+
+<h3>The grip does nothing</h3>
+<p>The drag must begin on the <b>&#10215;</b> button itself. Pressing on the group
+name or the tab title edits text instead.</p>
+
+<h3>I cannot drop a row onto the window I want</h3>
+<p>Drop onto the <i>table area</i> of the target window &mdash; its rows. The blue
+outline around a table confirms it is a valid target. A window with no tabs yet
+has no rows to aim at; add a tab first, then drag.</p>
+
+<h3>My drag did not stick</h3>
+<p>The drop only commits inside a table. Releasing outside the tables cancels.</p>
+
+<h3>Rows went back to their old order</h3>
+<p>You probably had &ldquo;sort groups alphabetically&rdquo; checked. It now turns
+itself off on the first drag; re-check it if you want the sorted view back.</p>
+
+<h3>The port is already in use</h3>
+<p>Pass another one: <tt>python chrome_report_edit_v1.4.py --port 8766</tt>.</p>
+
+<!-- ============================ 10 ============================ -->
+<h2>10&nbsp;&nbsp;Relationship to the report generator</h2>
+<pre>chrome_report_v1.4.py      --writes--&gt;   chrome_tabs_Default_v1.4.html
+                                                        |
+                                          opened in the editor
+                                                        v
+chrome_report_edit_v1.4.py  &lt;--saves--   any name you type</pre>
+
+<div class="warn">
+  The editor reads and writes the same HTML the generator produces, so you can
+  generate a report, tidy the order by dragging, and reopen the saved file whenever
+  you like. If you then re-run the generator it will overwrite whatever default
+  report name it uses &mdash; save your edited copy under a different name to keep it.
+</div>
+
+<footer>chrome_tab_organiser &mdash; v1.4 editor update &middot; document suffix _261004</footer>
+
+</body>
+</html>

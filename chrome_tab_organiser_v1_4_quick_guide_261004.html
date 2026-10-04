@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chrome_tab_organiser — v1.4 Editor Quick Guide</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif; color:#20242e;
+         font-size: 10.5pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 19pt; margin: 0 0 2pt; }
+  h2 { font-size: 13pt; color:#1663c5; border-bottom: 2px solid #1663c5;
+       padding-bottom: 3pt; margin: 16pt 0 8pt; page-break-after: avoid; }
+  h3 { font-size: 11pt; margin: 10pt 0 4pt; page-break-after: avoid; }
+  p { margin: 5pt 0; }
+  ul, ol { margin: 5pt 0; padding-left: 19pt; }
+  li { margin: 3pt 0; }
+  tt, code { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+             background:#eef1f6; border-radius: 3px; padding: 0 3px; color:#0b3d91; }
+  pre { background:#1f2430; color:#e8ecf3; border-radius: 6px; padding: 8pt 10pt;
+        font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+        white-space: pre-wrap; margin: 7pt 0; page-break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 7pt 0; font-size: 9.5pt; }
+  th { background:#eef2fb; color:#1f2430; text-align:left; padding:4pt 7pt;
+       border:1px solid #d7dbe2; }
+  td { padding:4pt 7pt; border:1px solid #d7dbe2; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .sub { color:#6b7280; font-size: 11pt; margin-bottom: 14pt; }
+  .new { background:#e8f0fe; border-left:4px solid #1a73e8; border-radius:4px;
+         padding: 8pt 11pt; margin: 9pt 0; }
+  .note { background:#fff8e6; border-left:4px solid #f29900; border-radius:4px;
+          padding: 8pt 11pt; margin: 9pt 0; }
+  .tip { background:#e9f5ec; border-left:4px solid #188038; border-radius:4px;
+         padding: 8pt 11pt; margin: 9pt 0; }
+  .rowdemo { background:#f6f7f9; border:1px dashed #b9bfc9; border-radius:6px;
+             padding:9pt 11pt; margin:9pt 0; }
+  .rowdemo table { margin: 0; font-size: 9pt; }
+  .grip { background:#1a73e8; color:#fff; border-radius:3px; padding:0 4px;
+          font-weight:700; }
+  .grp { background:#1a73e8; color:#fff; padding:1px 5px; border-radius:3px; }
+  footer { margin-top: 16pt; color:#9aa0a6; font-size: 8.5pt; text-align:center; }
+  .small { font-size: 9pt; color:#6b7280; }
+</style>
+</head>
+<body>
+
+<h1>chrome_tab_organiser</h1>
+<div class="sub">v1.4 Editor Quick Guide &middot; document suffix <tt>_261004</tt></div>
+
+<h2>Start it</h2>
+<pre>python chrome_report_edit_v1.4.py</pre>
+<p>or double-click <tt>chrome_report_edit_v1.4.exe</tt>.
+It opens <tt>http://127.0.0.1:8765/</tt>. Pick a report from the dropdown and press
+<b>Load</b>, or use <b>Open&hellip;</b> to load a file from anywhere.</p>
+
+<h2>The one new thing: drag to reorder</h2>
+
+<div class="rowdemo">
+<table>
+  <tr><th>Group</th><th>Tab</th><th>URL</th></tr>
+  <tr>
+    <td><span class="grip">&#10215;</span> + &times;
+        <span class="grp">ChIP</span></td>
+    <td>Alpha</td><td>https://a.example/</td>
+  </tr>
+</table>
+<p class="small" style="margin:5pt 0 0;">&#10215; press and hold HERE, then drag</p>
+</div>
+
+<ol>
+  <li>Press and hold the <b>&#10215; grip</b>.</li>
+  <li>Drag up or down inside the window, or into <b>another window's table</b>.</li>
+  <li>Release to drop.</li>
+</ol>
+
+<table>
+  <tr><th>Drop point</th><th>Result</th></tr>
+  <tr><td>Top half of a row</td><td>Insert <b>before</b> it</td></tr>
+  <tr><td>Bottom half of a row</td><td>Insert <b>after</b> it</td></tr>
+  <tr><td>Below the last row</td><td>Insert at the <b>end</b></td></tr>
+  <tr><td>Another window's table</td><td>Insert into <b>that window</b></td></tr>
+</table>
+
+<p>The dragged row is dimmed; the target table gets a blue outline.</p>
+
+<div class="note">
+  <b>Starts from the grip only.</b> Clicking the group name, tab title or URL still
+  edits that text, and links still do not jump &mdash; dragging never gets in the
+  way of hand-editing.
+</div>
+
+<h2>Sorting groups</h2>
+<div class="new">
+  The <b>sort groups alphabetically</b> checkbox puts ungrouped tabs first, then
+  groups A&rarr;Z. <b>Starting a drag switches it off automatically</b> so your
+  manual order is kept. Unchecking afterwards will not snap rows back.
+</div>
+
+<h2>Other controls (unchanged)</h2>
+<table>
+  <tr><th>Control</th><th>What it does</th></tr>
+  <tr><td>Click <b>Window N</b></td><td>Rename the window</td></tr>
+  <tr><td>Click a <b>group chip</b></td><td>Rename the group</td></tr>
+  <tr><td>Click a <b>tab title / URL</b></td><td>Edit it in place</td></tr>
+  <tr><td><b>+</b> on a row</td><td>Insert a tab after that row</td></tr>
+  <tr><td><b>&times;</b> on a row</td><td>Delete that tab</td></tr>
+  <tr><td><b>Add tab</b> in a window head</td><td>Insert into that window</td></tr>
+  <tr><td><b>Ctrl/&#8984; + Backspace</b></td><td>Delete the focused row</td></tr>
+  <tr><td><b>Save</b> / <tt>Enter</tt> in the name box</td><td>Write the report to disk</td></tr>
+</table>
+
+<h2>Saving</h2>
+<p>Type a new name to create a new file, or leave the existing name to overwrite
+the file you loaded. Names must be simple <tt>.html</tt> files inside the managed
+folder. Editor controls are stripped automatically &mdash; the saved file is a
+clean report, ready to open in any browser.</p>
+
+<h2>Row numbering</h2>
+<p><tt>data-pos</tt> is renumbered <tt>1..N</tt> after every insert, delete, drag,
+sort and save. Older reports that have no <tt>data-pos</tt> at all stay that way.</p>
+
+<footer>chrome_tab_organiser &mdash; v1.4 editor quick guide &middot; _261004</footer>
+
+</body>
+</html>

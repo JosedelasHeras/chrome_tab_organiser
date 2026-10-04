@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Organiser (report actions)",
+  "version": "1.4",
+  "description": "Adds 'open in Chrome' buttons to chrome_report HTML reports: opens whole windows or single tab groups as real Chrome windows with real Chrome tab groups. Copies only - never moves or closes anything.",
+  "permissions": ["tabs", "tabGroups", "windows"],
+  "host_permissions": ["file:///*", "http://localhost/*", "http://127.0.0.1/*"],
+  "content_scripts": [
+    {
+      "matches": ["file:///*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
