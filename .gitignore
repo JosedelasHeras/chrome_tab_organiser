@@ -18,9 +18,13 @@ v1_out/
 v1_1_out_260911/
 
 # older stuff folder
-older stuff/*
+older stuff/
 
 # misc intermediates
 #build_exe.py
 test_editor_js.py
+
+# library
+Chrome_tab_LIBRARY_261005/
+
 
