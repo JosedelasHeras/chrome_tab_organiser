@@ -3,19 +3,21 @@
 **chrome_report** (latest: `chrome_report_v1.4.py`)
 — generate HTML (and JSON) reports of your open Chrome tabs, organised by tab group
 
-**chrome_report_edit** (latest: `chrome_report_edit_v1.41.py`)
+**chrome_report_edit** (latest: `chrome_report_edit_v1.5.py`)
 — a local web app to edit those reports: rename windows, groups & tabs, insert /
 delete rows, **drag rows to reorder (within and across windows)**, sort groups
-alphabetically, save under a new name
+alphabetically, **import tabs straight from the running Chrome**, save under a
+new name
 
 *Self-contained tools — Python standard library only, nothing to install.
 Pre-built Windows executables are included: `chrome_report_v1.4.exe` and
-`chrome_report_edit_v1.41.exe`.*
+`chrome_report_edit_v1.5.exe`.*
 
 > **Typical flow**
 > 1. `python chrome_report_v1.4.py --json --outdir reports` → create the report(s).
-> 2. `python chrome_report_edit_v1.41.py --dir reports` → open the editor in your browser.
-> 3. Edit, drag rows into place, then **Save as** a new name, e.g. `final_2026.html`.
+> 2. `python chrome_report_edit_v1.5.py --dir reports` → open the editor in your browser.
+> 3. Edit, drag rows into place, import the tabs you forgot to include, then
+>    **Save as** a new name, e.g. `final_2026.html`.
 
 ---
 
@@ -24,7 +26,7 @@ Pre-built Windows executables are included: `chrome_report_v1.4.exe` and
 | | What it does | How to run |
 |---|---|---|
 | **chrome_report** | Reads Chrome's session files from disk (Chrome can stay running) and writes a self-contained HTML report (+ optional JSON) of every window, tab and tab group. | `python chrome_report_v1.4.py [options]` or `chrome_report_v1.4.exe [options]` |
-| **chrome_report_edit** | Serves a localhost-only editor at `http://127.0.0.1:8765/`, shows the report exactly as it will look, and writes changes back to disk when you press **Save**. | `python chrome_report_edit_v1.41.py [options]` or `chrome_report_edit_v1.41.exe [options]` |
+| **chrome_report_edit** | Serves a localhost-only editor at `http://127.0.0.1:8765/`, shows the report exactly as it will look, and writes changes back to disk when you press **Save**. | `python chrome_report_edit_v1.5.py [options]` or `chrome_report_edit_v1.5.exe [options]` |
 
 Both run on Windows, macOS and Linux (the `.exe` files are Windows-only), never
 talk to any external service, and modify nothing on disk except via an explicit
@@ -92,12 +94,13 @@ badge at the top of the report links to the install steps.
 
 ---
 
-## 3  chrome_report_edit v1.41
+## 3  chrome_report_edit v1.5
 
 ### 3.1  Startup & options
 
 ```
-python chrome_report_edit_v1.41.py [--dir PATH] [--port 8765] [--host 127.0.0.1] [--no-browser]
+python chrome_report_edit_v1.5.py [--dir PATH] [--port 8765] [--host 127.0.0.1] [--no-browser]
+                                   [--no-chrome]
 ```
 
 | Option | Meaning |
@@ -107,6 +110,7 @@ python chrome_report_edit_v1.41.py [--dir PATH] [--port 8765] [--host 127.0.0.1]
 | `--port N` | Local port. Default `8765`. |
 | `--host ADDR` | Bind address. Default `127.0.0.1` (loopback only). |
 | `--no-browser` | Print the URL instead of auto-opening the browser. |
+| `--no-chrome` | Switch the live Chrome import off; no session files are read at all. |
 
 A browser tab opens at `http://127.0.0.1:8765/`. Pick a report from the
 **dropdown** and press **Load**, or click **Open…** to load any `.html` file.
@@ -125,7 +129,8 @@ Press `Ctrl+C` in the terminal to stop the server.
    (existing names auto-suggested, colour reused), tab name and URL.
 5. **Drag rows to reorder** — see 3.3.
 6. **Sort groups alphabetically** — see 3.4.
-7. **Save** — see 3.5.
+7. **Import tabs from Chrome** — see 3.5 (new in v1.5).
+8. **Save** — see 3.6.
 
 Statistics — windows · tabs · groups — update live as you edit.
 
@@ -137,7 +142,8 @@ Statistics — windows · tabs · groups — update live as you edit.
   table is outlined.
 - **Release anywhere over the table** — over a group chip, another row's grips,
   a tab link or a bare cell; the move commits. Above a row's midpoint inserts
-  *before* it, below inserts *after* it, past the last row appends at the end.
+  *before* it, below inserts *after* it, past the last row appends at the end
+  (releasing over a link always places the tab just before the hovered row).
 - Drags start **only from the grip** — clicking text still edits it, links stay
   clickable, and rows are never accidentally dragged.
 
@@ -152,7 +158,60 @@ Loading a report always shows its saved order, with the box reset to unticked.
 wins; merely clicking the grip does not. Inserting while sorted places the row
 where the dialog says and does not re-sort it.
 
-### 3.5  Saving
+### 3.5  Importing tabs from the running Chrome (new in v1.5)
+
+Each window header carries a green **Add tabs from window** button next to
+**Add tab**. It copies tabs out of the Chrome you are actually using into the
+window whose header you clicked — Chrome keeps running, nothing is closed, and
+only its session-recovery files are read (exactly as the generator does).
+
+1. Click **Add tabs from window** on the window that should receive the tabs.
+2. The **Add tabs from Chrome** dialog opens with a live list:
+   - **Chrome windows** — `Window 1`, `Window 2`, … with each one's tab and
+     group count. Chrome has no user-assigned window names, so they are listed
+     in tab-strip order and the one Chrome is showing now is marked *active*.
+   - **Chrome tab groups** — every named group across all windows, with its tab
+     count (e.g. `ChIP — 24 tabs`).
+3. The line under the list previews how many tabs would be added and where they
+   would land.
+4. **Add tabs**.
+
+| Source | Result |
+|---|---|
+| A Chrome window | Every tab in it, in Chrome's own tab-strip order |
+| A named group | Every tab in that group, across all windows |
+
+What comes across, and what does not:
+
+- **Group name and colour** are preserved, so a chip looks the same as it does
+  in Chrome.
+- **Title and URL** are copied as they are. The active-window marker (star) is
+  **not** imported — that mark belongs to the report's own window.
+- **Tabs whose URL is already in the target window are skipped**, and the status
+  bar says how many were skipped. Comparison ignores letter case, a trailing
+  slash and `#fragment`, so `Example.com`, `example.com/` and `example.com#top`
+  count as the same page.
+- If Chrome legitimately has the same page open twice, both are imported — only
+  what is *already in the report* is skipped. Importing the same window twice
+  therefore adds nothing the second time.
+- Grouped tabs are placed **alphabetically by their own group**, so importing
+  keeps a sorted window sorted.
+
+Where the imported tabs land:
+
+| "sort groups alphabetically" | Placement |
+|---|---|
+| unticked (default) | Inserted at the **very beginning** of the target window, in Chrome's order |
+| ticked | Inserted and the whole window re-sorted: ungrouped first, then groups A–Z |
+
+Imported rows are ordinary rows: renumbered (`data-pos`), editable in place, and
+draggable by their grip like any other.
+
+If Chrome's session files cannot be read, the dialog says so and changes
+nothing. The newest session file is often locked while Chrome is writing it —
+that is normal, and the newest complete snapshot is used instead.
+
+### 3.6  Saving
 
 Nothing is written to disk until you press **Save** (or `Enter` in the name
 box). Names must be simple `*.html` file names — paths, slashes and traversal
@@ -175,13 +234,15 @@ python chrome_report_v1.4.py --json --outdir reports
 #    (answer the window prompts; or add --keep-all to accept all defaults)
 
 # 2) Open the editor pointed at that folder (browser opens automatically)
-python chrome_report_edit_v1.41.py --dir reports
+python chrome_report_edit_v1.5.py --dir reports
 
 # 3) In the browser: load chrome_tabs_Default_v1.4.html
 #    - click "Window 3" heading, type "Hi-C"
 #    - press-and-hold the ↕ grip on a row, drag it into "Window 1", release
 #    - remove stale rows with  x
 #    - add a tab with + next to a row (group "ChIP", name "bioRxiv", URL)
+#    - forgot a tab? "Add tabs from window" on that window's header,
+#      pick a Chrome window or a Chrome group, then Add tabs
 
 # 4) Type "final_2026.html" in the name box and press Save
 #    -> reports\final_2026.html is written and listed in the dropdown
@@ -198,12 +259,12 @@ start reports\final_2026.html
 #    or from a terminal, hands-free:
 chrome_report_v1.4.exe --keep-all --json --outdir reports
 
-# 2) Double-click chrome_report_edit_v1.41.exe
+# 2) Double-click chrome_report_edit_v1.5.exe
 #    (manages the folder the exe lives in and opens the browser itself)
 #    or point it at the reports folder:
-chrome_report_edit_v1.41.exe --dir reports
+chrome_report_edit_v1.5.exe --dir reports
 
-# 3) Load, edit, drag rows, Save — exactly as in workflow A.
+# 3) Load, edit, drag rows, import Chrome tabs, Save — as in workflow A.
 ```
 
 ### C  Sorting + drag interplay
@@ -214,6 +275,24 @@ chrome_report_edit_v1.41.exe --dir reports
 #   press-and-hold its row's ↕ grip and drag it to the new spot
 #   -> the sort box switches off automatically, your order is kept
 # untick/re-tick to go back to alphabetical, then Save to keep that copy
+```
+
+### D  Filling a report from the live Chrome
+
+```text
+# You already made a report, but since then you opened more tabs in Chrome.
+# Leave Chrome running, then in the editor:
+
+# unsorted: the chosen Chrome window's tabs go to the top of the target
+#   "Add tabs from window" -> Chrome windows -> Window 3 -> Add tabs
+#   -> "Added 18 tabs from Window 3 (2 already in this window)."
+
+# sorted: ticked, so each imported tab lands in its own group, A-Z
+#   tick "sort groups alphabetically" first, then import a group
+#   -> Chrome tab groups -> ChIP -> Add tabs
+#   -> that window stays alphabetical
+
+# Save as a new name; the imported rows are normal rows from then on
 ```
 
 ---
@@ -228,8 +307,13 @@ chrome_report_edit_v1.41.exe --dir reports
 | Editor dropdown is empty | It lists `*.html` in `--dir` only. Start with the folder holding your report, or use **Open…**. |
 | A drag doesn't start | Drags begin only from the **↕ grip** in the Group cell — press, hold, move. Clicking the text still edits it. |
 | Report looks reordered on its own | It shouldn't: loading always shows the saved order and the sort box resets. Untick restores the current session's original order; re-load to be sure. |
+| **Add tabs from window** says the Chrome session is not available | Chrome's session folder wasn't found (usually a non-Default profile or Chrome for another OS account), or Chrome has no open windows. Start Chrome with a tab open and try again. |
+| The imported list misses the newest tabs | Chrome had its newest session file locked while writing. The newest complete snapshot is used — close the dialog and click the button again after a moment. |
+| Can I import if Chrome is closed? | Yes. The session files are read from disk, so a closed Chrome still works (its last saved session). |
+| I don't want the editor touching Chrome at all | Start it with `--no-chrome`; the import button then reports the feature is disabled and no session file is opened. |
+| The Chrome window names don't match my report's window names | Expected — Chrome has no window names, so the picker lists `Window 1…N` in tab-strip order and marks the active one. You always choose where the tabs go in the report. |
 | Must Chrome be closed? Are the tools safe? | No, and yes: session files are only read, everything is localhost-only, and nothing is written except via an explicit **Save**. |
 
 ---
 
-*chrome_tab_organiser — chrome_report_v1.4.py · chrome_report_edit_v1.41.py (Python 3, no external dependencies) · `_261004`*
+*chrome_tab_organiser — chrome_report_v1.4.py · chrome_report_edit_v1.5.py (Python 3, no external dependencies) · `_261005`*

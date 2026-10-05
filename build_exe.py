@@ -8,14 +8,16 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 TMP = os.path.join(tempfile.gettempdir(), "opencode")
 WORK = os.path.join(TMP, "exe_build")
 
-EDITOR_SRC = os.path.join(ROOT, "chrome_report_edit_v1.41.py")
+EDITOR_SRC = os.path.join(ROOT, "chrome_report_edit_v1.5.py")
 GENERATOR_SRC = os.path.join(ROOT, "chrome_report_v1.4.py")
 
-EDITOR_OLD = """    global BASE
+EDITOR_OLD = """    global BASE, ALLOW_CHROME
+    ALLOW_CHROME = not args.no_chrome
     BASE = os.path.realpath(args.dir or os.path.dirname(
         os.path.abspath(__file__)))"""
 
-EDITOR_NEW = """    global BASE
+EDITOR_NEW = """    global BASE, ALLOW_CHROME
+    ALLOW_CHROME = not args.no_chrome
     BASE = os.path.realpath(args.dir or (
         os.path.dirname(os.path.abspath(sys.executable))
         if getattr(sys, "frozen", False)
@@ -44,7 +46,7 @@ def frozen_copy():
     assert src.count(EDITOR_OLD) == 1, "frozen-guard anchor not found exactly once"
     frozen = src.replace(EDITOR_OLD, EDITOR_NEW)
     os.makedirs(TMP, exist_ok=True)
-    path = os.path.join(TMP, "chrome_report_edit_v1.41_frozen.py")
+    path = os.path.join(TMP, "chrome_report_edit_v1.5_frozen.py")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(frozen)
     return path
@@ -54,7 +56,7 @@ def main():
     build_exe("chrome_report_v1.4", GENERATOR_SRC)
     editor_src = frozen_copy()
     try:
-        build_exe("chrome_report_edit_v1.41", editor_src)
+        build_exe("chrome_report_edit_v1.5", editor_src)
     finally:
         os.remove(editor_src)
     print("Done. Deliveries in %s" % ROOT)

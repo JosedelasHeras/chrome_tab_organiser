@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""chrome_report_edit_v1.41.py — local web app for editing the Chrome tab HTML report.
+"""chrome_report_edit_v1.5.py — local web app for editing the Chrome tab HTML report.
 
 Run:
-  python chrome_report_edit_v1.41.py [--dir PATH] [--port 8765]
-                                      [--host 127.0.0.1] [--no-browser]
+  python chrome_report_edit_v1.5.py [--dir PATH] [--port 8765]
+                                     [--host 127.0.0.1] [--no-browser]
+                                     [--no-chrome]
 
 Starts a tiny stdlib HTTP server and opens the editor in your browser.
 The editor lets you:
@@ -14,7 +15,19 @@ The editor lets you:
   - reorder tabs by dragging the ⠿ grip on a row, up or down inside the
     window, or across into any other window (the grip itself is the drag
     source, so editing text in rows is never disturbed)
+  - import tabs from the LIVE Chrome session into any window
+    ("Add tabs from window" beside Add tab): pick one of Chrome's open
+    windows or one of its named tab groups, and every tab is copied into
+    the target window. Tabs whose URL is already in the target window are
+    skipped. Without "sort groups alphabetically" ticked the imported tabs
+    are inserted at the very beginning of the window (in source order);
+    with it ticked, each tab is placed alphabetically by its own group so
+    the window stays globally sorted. Group names AND colours come across.
   - save the modified report to disk under a name you type
+
+Chrome's own session-recovery files (the SNSS format) are parsed to build
+the live tab list, so Chrome can keep running while you import. Pass
+--no-chrome to skip that feature entirely.
 
 Only the standard library is used. The managed directory (--dir) defaults
 to this script's own directory; all reports there ending in .html are
@@ -24,13 +37,16 @@ import argparse
 import json
 import os
 import re
+import struct
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 BASE = os.getcwd()
+ALLOW_CHROME = True
 
 PAGE_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -77,19 +93,21 @@ PAGE_HTML = """<!DOCTYPE html>
     justify-content:center; background:var(--bg); z-index:50; color:var(--mut);
     font-size:15px; }
   #hint.hidden { display:none; }
-  #modal { position:fixed; inset:0; background:rgba(15,20,30,.35);
+  #modal, #wModal { position:fixed; inset:0; background:rgba(15,20,30,.35);
     display:none; align-items:center; justify-content:center; z-index:200; }
-  #modal.open { display:flex; }
-  #modal .box { background:#fff; border-radius:8px; padding:18px 20px;
-    width:460px; max-width:92vw; box-shadow:0 8px 30px rgba(0,0,0,.18); }
-  #modal h2 { margin:0 0 12px; font-size:15px; }
-  #modal label { display:block; font-size:12px; color:var(--mut);
-    margin:10px 0 4px; }
-  #modal input, #modal select { width:100%; height:30px; font:inherit;
+  #modal.open, #wModal.open { display:flex; }
+  #modal .box, #wModal .box { background:#fff; border-radius:8px;
+    padding:18px 20px; width:460px; max-width:92vw;
+    box-shadow:0 8px 30px rgba(0,0,0,.18); }
+  #modal h2, #wModal h2 { margin:0 0 12px; font-size:15px; }
+  #modal label, #wModal label { display:block; font-size:12px;
+    color:var(--mut); margin:10px 0 4px; }
+  #modal input, #modal select, #wModal input, #wModal select {
+    width:100%; height:30px; font:inherit;
     font-size:13px; border:1px solid var(--line); border-radius:4px;
     padding:0 8px; }
-  #modal .rowbtns { margin-top:16px; display:flex; justify-content:flex-end;
-    gap:8px; }
+  #modal .rowbtns, #wModal .rowbtns { margin-top:16px;
+    display:flex; justify-content:flex-end; gap:8px; }
 </style>
 </head>
 <body>
@@ -117,8 +135,21 @@ PAGE_HTML = """<!DOCTYPE html>
 <div id="hint">Pick a report, or open a .html file, then edit: click text to
   rename (window, group, tab, URL); use +&nbsp;/&times; buttons in the rows to
   insert or delete entries; drag the &nbsp;grip to move a tab up, down, or into
-  another window.</div>
+  another window; or use <b>Add tabs from window</b> in a window header to copy
+  tabs out of the running Chrome.</div>
 <iframe id="preview"></iframe>
+<div id="wModal">
+  <div class="box">
+    <h2>Add tabs from Chrome</h2>
+    <label>From</label>
+    <select id="wSource"></select>
+    <div id="wInfo" style="font-size:12px;color:#6b7280;margin-top:8px"></div>
+    <div class="rowbtns">
+      <button id="wCancel" class="btn" type="button">Cancel</button>
+      <button id="wOk" class="btn primary" type="button">Add tabs</button>
+    </div>
+  </div>
+</div>
 <div id="modal">
   <div class="box">
     <h2>Insert a tab</h2>
@@ -160,6 +191,10 @@ var fTitle = document.getElementById("fTitle");
 var fUrl = document.getElementById("fUrl");
 var groupList = document.getElementById("groupList");
 var sortChk = document.getElementById("sortGroups");
+var wModal = document.getElementById("wModal");
+var wSource = document.getElementById("wSource");
+var wInfo = document.getElementById("wInfo");
+var pendingImport = null;   // {winIdx, snapshot} for the import modal
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
@@ -502,6 +537,8 @@ function injectEditor(d) {
       " #d7dbe2; border-radius:4px; font-size:11px; padding:1px 8px;",
       " cursor:pointer; margin-left:6px; }",
       "button.ce-add:hover { background:#eef2fb; }",
+      "button.ce-add.ce-addwin { color:#188038; border-color:#b7e0c4; }",
+      "button.ce-add.ce-addwin:hover { background:#e6f4ea; }",
       "button.ce-inject.ce-grip { cursor:grab; user-select:none;",
       " -webkit-user-select:none; touch-action:none; }",
       "button.ce-inject.ce-grip:active { cursor:grabbing; }",
@@ -524,8 +561,15 @@ function injectEditor(d) {
       ev.preventDefault(); ev.stopPropagation();
       openInsert(null, winIndex(win));
     });
+    var addWin = el("button", "ce-inject ce-add ce-addwin",
+                    "Add tabs from window");
+    addWin.title = "Copy tabs from the live Chrome session into this window";
+    addWin.addEventListener("click", function(ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      openImport(winIndex(win));
+    });
     var head = win.querySelector(".window-head");
-    if (head) head.appendChild(add);
+    if (head) { head.appendChild(add); head.appendChild(addWin); }
   });
 
   d.querySelectorAll("tbody tr").forEach(setUpRow);
@@ -752,7 +796,211 @@ function doInsert() {
   setStatus("Inserted into Window " + (win + 1) + ".");
 }
 
-/* add tab button in the window (from header) */
+/* ---------- import tabs from the live Chrome session ----------
+   The report's own window names are user-assigned when a report is
+   generated, so they cannot be matched against Chrome (which has no
+   window names). The picker therefore lists the live windows in tab-strip
+   order plus Chrome's named tab groups, and the user chooses. */
+
+/* URLs are compared loosely: chrome:// paged history aside, a trailing
+   slash or letter case is the usual difference between the same page. */
+function normUrl(u) {
+  var s = String(u == null ? "" : u).trim();
+  if (!s) return "";
+  s = s.replace(/#.*$/, "");
+  try {
+    var a = document.createElement("a");
+    a.href = s;
+    if (a.protocol && a.host) {
+      return (a.protocol + "//" + a.host +
+              (a.pathname || "/").replace(/\\/+$/, "") +
+              (a.search || "")).toLowerCase();
+    }
+  } catch (e) { /* fall through to the raw form */ }
+  return s.replace(/\\/+$/, "").toLowerCase();
+}
+
+function sourceLabel(opt) {
+  return opt ? opt.textContent : "";
+}
+
+function tabsForSelection(snap, sel) {
+  if (!snap || !sel) return [];
+  var kind = sel.split("\t");
+  if (kind[0] === "w") {
+    for (var i = 0; i < snap.windows.length; i++) {
+      if (String(snap.windows[i].id) === kind[1]) return snap.windows[i].tabs;
+    }
+    return [];
+  }
+  if (kind[0] === "g") {
+    var want = kind[1].toLowerCase();
+    var out = [];
+    snap.windows.forEach(function(w) {
+      w.tabs.forEach(function(t) {
+        if ((t.group || "").trim().toLowerCase() === want) out.push(t);
+      });
+    });
+    return out;
+  }
+  return [];
+}
+
+function refreshImportInfo() {
+  var n = tabsForSelection(pendingImport && pendingImport.snap,
+                           wSource.value).length;
+  if (!n) {
+    wInfo.textContent = "Nothing to add for this choice.";
+    return;
+  }
+  wInfo.textContent = n + " tab" + (n === 1 ? "" : "s") + " will be added" +
+    (sortChk.checked ? ", placed alphabetically by group."
+                     : ", inserted at the beginning of the window.");
+}
+
+function openImport(winIdx) {
+  if (!FDOC) { setStatus("Load a report first."); return; }
+  var wins = FDOC.querySelectorAll("section.window");
+  if (!wins.length || winIdx == null || winIdx < 0 || winIdx >= wins.length) {
+    setStatus("Import failed: no such window."); return;
+  }
+  wInfo.textContent = "Reading Chrome's session files...";
+  wSource.innerHTML = "";
+  wModal.classList.add("open");
+  setStatus("");
+  fetch("/api/live").then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (!j || !j.ok) {
+        pendingImport = null;
+        wSource.innerHTML = "";
+        wInfo.textContent = "Chrome session not available: " +
+          ((j && j.error) || "unknown error");
+        return;
+      }
+      pendingImport = { winIdx: winIdx, snap: j };
+      wSource.innerHTML = "";
+      var totalTabs = 0;
+      if (j.windows.length) {
+        var og = document.createElement("optgroup");
+        og.label = "Chrome windows";
+        j.windows.forEach(function(w) {
+          totalTabs += w.tabs.length;
+          var o = document.createElement("option");
+          o.value = "w\t" + w.id;
+          var gset = {};
+          w.tabs.forEach(function(t) {
+            if (t.group) gset[t.group.trim().toLowerCase()] = true;
+          });
+          o.textContent = w.name + " — " + w.tabs.length + " tab" +
+            (w.tabs.length === 1 ? "" : "s") + " · " +
+            Object.keys(gset).length + " group" +
+            (Object.keys(gset).length === 1 ? "" : "s") +
+            (w.active ? " · active" : "");
+          og.appendChild(o);
+        });
+        wSource.appendChild(og);
+      }
+      if (j.groups.length) {
+        var gg = document.createElement("optgroup");
+        gg.label = "Chrome tab groups";
+        j.groups.forEach(function(g) {
+          var o = document.createElement("option");
+          o.value = "g\t" + g.name;
+          o.textContent = g.name + " — " + g.count + " tab" +
+            (g.count === 1 ? "" : "s");
+          gg.appendChild(o);
+        });
+        wSource.appendChild(gg);
+      }
+      if (!wSource.options.length) {
+        pendingImport = null;
+        wInfo.textContent = "No Chrome windows or tab groups found.";
+        return;
+      }
+      wSource.selectedIndex = 0;
+      var skipped = (j.skipped || []).length;
+      refreshImportInfo();
+      setStatus("Chrome snapshot: " + j.windows.length + " window" +
+        (j.windows.length === 1 ? "" : "s") + " · " + totalTabs + " tabs · " +
+        j.groups.length + " group" + (j.groups.length === 1 ? "" : "s") +
+        (skipped ? " · " + skipped + " session file(s) skipped" : ""));
+    })
+    .catch(function(err) {
+      pendingImport = null;
+      wInfo.textContent = "Could not read Chrome's session files: " + err;
+    });
+}
+
+function closeImport() {
+  wModal.classList.remove("open");
+  pendingImport = null;
+}
+
+function doImport() {
+  var p = pendingImport;
+  if (!p || !p.snap) { closeImport(); return; }
+  var wins = FDOC.querySelectorAll("section.window");
+  var win = wins[p.winIdx];
+  if (!win) { setStatus("Import failed: no such window."); closeImport(); return; }
+  var tbody = win.querySelector("tbody");
+  if (!tbody) { setStatus("Import failed: window has no table."); closeImport(); return; }
+  var picked = sourceLabel(wSource.options[wSource.selectedIndex]);
+  var tabs = tabsForSelection(p.snap, wSource.value);
+  if (!tabs.length) {
+    setStatus("Nothing to import for that choice.");
+    closeImport();
+    return;
+  }
+
+  /* Skip URLs already in the target window. Chrome is allowed to have the
+     same page open twice, and the import copies the window as it really is,
+     so only the target is consulted here: repeating the import afterwards
+     still adds nothing, because those URLs are in the window by then. */
+  var have = {};
+  Array.prototype.forEach.call(tbody.querySelectorAll("tr"), function(tr) {
+    var a = tr.querySelector("td.url a") || tr.querySelector("td.tab a");
+    var k = normUrl(a ? a.getAttribute("href") : "");
+    if (k) have[k] = true;
+  });
+  var fresh = [];
+  tabs.forEach(function(t) {
+    var k = normUrl(t.url);
+    if (k && have[k]) return;
+    fresh.push(t);
+  });
+  var skipped = tabs.length - fresh.length;
+  if (!fresh.length) {
+    setStatus("Nothing to import: all " + tabs.length + " tab" +
+      (tabs.length === 1 ? "" : "s") + " already in this window.");
+    closeImport();
+    return;
+  }
+
+  var sorted = sortChk.checked;
+  /* Build the block in a fragment first. Prepending row by row would put
+     each row in front of the one added before it, reversing the source
+     order; a fragment keeps it as written. Unsorted goes to the very top
+     of the window, sorted is appended and sortGroups() then places every
+     row by its own group (source order breaks ties inside a group). */
+  var frag = FDOC.createDocumentFragment();
+  fresh.forEach(function(t) {
+    var tr = FDOC.createElement("tr");
+    tr.innerHTML = rowMarkup(t.group, t.title, t.url, false,
+                             t.color || "#5f6368");
+    setUpRow(tr);
+    frag.appendChild(tr);
+  });
+  if (sorted) tbody.appendChild(frag);
+  else tbody.insertBefore(frag, tbody.firstChild);
+  if (sorted) sortGroups();
+
+  renumberPos(win);
+  refreshStats();
+  closeImport();
+  setStatus("Added " + fresh.length + " tab" + (fresh.length === 1 ? "" : "s") +
+    " from " + picked +
+    (skipped ? " (" + skipped + " already in this window)" : "") + ".");
+}
 
 /* ---------- wires ---------- */
 document.getElementById("btnLoad").addEventListener("click", function() {
@@ -775,8 +1023,18 @@ sortChk.addEventListener("change", function() {
   if (sortChk.checked) { snapshotGroups(); sortGroups(); }
   else restoreGroups();
   renumberAll();
+  /* the import dialog describes its placement based on this box */
+  if (pendingImport) refreshImportInfo();
 });
 document.getElementById("fCancel").addEventListener("click", closeModal);
+document.getElementById("wCancel").addEventListener("click", closeImport);
+document.getElementById("wOk").addEventListener("click", function(ev) {
+  ev.preventDefault(); doImport();
+});
+wSource.addEventListener("change", refreshImportInfo);
+wModal.addEventListener("click", function(ev) {
+  if (ev.target === wModal) closeImport();
+});
 document.getElementById("fOk").addEventListener("click", function(ev) {
   ev.preventDefault(); doInsert();
 });
@@ -795,6 +1053,336 @@ refreshFiles();
 </body>
 </html>
 """
+
+
+SNSS_MAGIC = b"SNSS"
+DEFAULT_PROFILE = "Default"
+
+# Command ids from Chrome's session-recovery format. Only the ones that
+# describe windows, tabs and tab groups are handled here. These must match
+# chrome_report_v1.4.py exactly or the stream desynchronises.
+CMD_SET_TAB_WINDOW = 0
+CMD_SET_TAB_INDEX_IN_WINDOW = 2
+CMD_UPDATE_TAB_NAVIGATION = 6
+CMD_SET_SELECTED_NAVIGATION_INDEX = 7
+CMD_SET_SELECTED_TAB_IN_INDEX = 8
+CMD_TAB_CLOSED = 16
+CMD_WINDOW_CLOSED = 17
+CMD_SET_ACTIVE_WINDOW = 20
+CMD_LAST_ACTIVE_TIME = 21
+CMD_SET_TAB_GROUP = 25
+CMD_SET_TAB_GROUP_METADATA = 27
+
+# Chrome tab-group colour ids, as written by CMD_SET_TAB_GROUP_METADATA.
+GROUP_COLORS = {
+    1: "#5f6368",
+    2: "#1a73e8",
+    3: "#d93025",
+    4: "#f29900",
+    5: "#188038",
+    6: "#d01884",
+    7: "#a142f4",
+    8: "#12a4af",
+    9: "#fa903e",
+}
+
+
+def align4(n):
+    return (n + 3) & ~3
+
+
+class Payload:
+    def __init__(self, data):
+        self.data = data
+        self.off = 0
+        self.n = len(data)
+
+    def _need(self, size):
+        if self.off + size > self.n:
+            raise EOFError("payload too short")
+
+    def u8(self):
+        self._need(1)
+        val = self.data[self.off]
+        self.off += 1
+        return val
+
+    def u32(self):
+        self._need(4)
+        val = struct.unpack_from("<I", self.data, self.off)[0]
+        self.off += 4
+        return val
+
+    def u64(self):
+        low = self.u32()
+        high = self.u32()
+        return (high << 32) | low
+
+    def string(self):
+        self._need(4)
+        size = struct.unpack_from("<I", self.data, self.off)[0]
+        self.off += 4
+        raw = self.data[self.off:self.off + size]
+        self.off += align4(size)
+        return raw.decode("utf-8", "replace")
+
+    def string16(self):
+        self._need(4)
+        count = struct.unpack_from("<I", self.data, self.off)[0]
+        self.off += 4
+        blen = count * 2
+        raw = self.data[self.off:self.off + blen]
+        self.off += align4(blen)
+        return raw.decode("utf-16-le", "replace")
+
+
+class SessionState:
+    def __init__(self):
+        self.tabs = {}
+        self.windows = {}
+        self.groups = {}
+        self.active_window_id = None
+
+    def get_tab(self, tab_id):
+        tab = self.tabs.get(tab_id)
+        if tab is None:
+            tab = {"id": tab_id, "win": 0, "idx": 0, "history": {},
+                   "current_hist": 0, "group": None, "deleted": False}
+            self.tabs[tab_id] = tab
+        return tab
+
+    def get_window(self, win_id):
+        win = self.windows.get(win_id)
+        if win is None:
+            win = {"id": win_id, "active_tab_idx": -1, "deleted": False}
+            self.windows[win_id] = win
+        return win
+
+    def get_group(self, high, low):
+        key = "%016x%016x" % (high, low)
+        group = self.groups.get(key)
+        if group is None:
+            group = {"high": high, "low": low, "name": "", "color": None}
+            self.groups[key] = group
+        return group
+
+
+def process_command(ctype, data, state):
+    p = Payload(data)
+    if ctype == CMD_SET_TAB_WINDOW:
+        win = p.u32()
+        tab = p.u32()
+        state.get_tab(tab)["win"] = win
+    elif ctype == CMD_SET_TAB_INDEX_IN_WINDOW:
+        tab = p.u32()
+        idx = p.u32()
+        state.get_tab(tab)["idx"] = idx
+    elif ctype == CMD_UPDATE_TAB_NAVIGATION:
+        p.u32()
+        tab = p.u32()
+        hist_idx = p.u32()
+        url = p.string()
+        title = p.string16()
+        state.get_tab(tab)["history"][hist_idx] = (url, title)
+    elif ctype == CMD_SET_SELECTED_NAVIGATION_INDEX:
+        tab = p.u32()
+        state.get_tab(tab)["current_hist"] = p.u32()
+    elif ctype == CMD_SET_SELECTED_TAB_IN_INDEX:
+        win = p.u32()
+        state.get_window(win)["active_tab_idx"] = p.u32()
+    elif ctype == CMD_TAB_CLOSED:
+        state.get_tab(p.u32())["deleted"] = True
+    elif ctype == CMD_WINDOW_CLOSED:
+        state.get_window(p.u32())["deleted"] = True
+    elif ctype == CMD_SET_ACTIVE_WINDOW:
+        state.active_window_id = p.u32()
+    elif ctype == CMD_SET_TAB_GROUP:
+        tab = p.u32()
+        p.u32()
+        high = p.u64()
+        low = p.u64()
+        state.get_tab(tab)["group"] = state.get_group(high, low)
+    elif ctype == CMD_SET_TAB_GROUP_METADATA:
+        p.u32()
+        high = p.u64()
+        low = p.u64()
+        name = p.string16()
+        group = state.get_group(high, low)
+        group["name"] = name
+        if p.off + 4 <= p.n:
+            group["color"] = p.u32()
+
+
+def parse_snss(path, state):
+    with open(path, "rb") as fh:
+        data = fh.read()
+    if len(data) < 8 or data[:4] != SNSS_MAGIC:
+        raise ValueError("not an SNSS file")
+    off = 8
+    count = 0
+    while off + 3 <= len(data):
+        size = struct.unpack_from("<H", data, off)[0]
+        off += 2
+        ctype = data[off]
+        off += 1
+        payload_len = size - 1
+        if payload_len < 0 or off + payload_len > len(data):
+            break
+        payload = data[off:off + payload_len]
+        off += payload_len
+        try:
+            process_command(ctype, payload, state)
+        except (EOFError, struct.error, ValueError, IndexError):
+            continue
+        count += 1
+    return count
+
+
+def read_session_file(path, state):
+    for attempt in range(3):
+        try:
+            return parse_snss(path, state)
+        except PermissionError:
+            if attempt == 2:
+                raise
+            time.sleep(0.3)
+    return 0
+
+
+def default_data_dir():
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or os.path.join(
+            os.path.expanduser("~"), "AppData", "Local")
+        return os.path.join(base, "Google", "Chrome", "User Data")
+    if sys.platform == "darwin":
+        return os.path.expanduser(
+            "~/Library/Application Support/Google/Chrome")
+    return os.path.expanduser("~/.config/google-chrome")
+
+
+def session_files(session_dir):
+    files = []
+    pat = re.compile(r"^(Session|Tabs)(?:_(\d+))?$")
+    for name in os.listdir(session_dir):
+        m = pat.match(name)
+        if not m:
+            continue
+        path = os.path.join(session_dir, name)
+        if not os.path.isfile(path) or os.path.getsize(path) == 0:
+            continue
+        gen = int(m.group(2)) if m.group(2) else float("inf")
+        files.append((gen, name, path))
+    files.sort()
+    return files
+
+
+def resolve_tab(tab):
+    hist = tab["history"]
+    if not hist:
+        return "", ""
+    current = tab["current_hist"]
+    if current in hist:
+        return hist[current]
+    return hist[max(hist)]
+
+
+def build_live_model(state):
+    windows = []
+    for win_id, win in state.windows.items():
+        if win["deleted"]:
+            continue
+        tabs = [t for t in state.tabs.values()
+                if t["win"] == win_id and not t["deleted"]]
+        if not tabs:
+            continue
+        tabs.sort(key=lambda t: t["idx"])
+        rows = []
+        for tab in tabs:
+            url, title = resolve_tab(tab)
+            group = tab["group"]
+            rows.append({
+                "url": url,
+                "title": title,
+                "group": group["name"] if group else None,
+                # Same default the generator uses for a colour-less group,
+                # so an imported chip is always a real colour.
+                "color": (GROUP_COLORS.get(group.get("color"), "#5f6368")
+                          if group else None),
+            })
+        windows.append({
+            "id": win_id,
+            "active": win_id == state.active_window_id,
+            "tabs": rows,
+        })
+    return windows
+
+
+def live_snapshot():
+    """Windows and named tab groups as Chrome currently has them.
+
+    Read-only: the session files are parsed, never written. Files that are
+    mid-write while Chrome is running are skipped with a reason, exactly as
+    the generator does, so the newest complete snapshot is used.
+    """
+    if not ALLOW_CHROME:
+        return {"ok": False, "error": "live Chrome import disabled "
+                                       "(--no-chrome)"}
+    data_dir = default_data_dir()
+    sessions = os.path.join(data_dir, DEFAULT_PROFILE, "Sessions")
+    if not os.path.isdir(sessions):
+        return {"ok": False,
+                "error": "Chrome session folder not found: %s" % sessions}
+    state = SessionState()
+    used = []
+    skipped = []
+    try:
+        candidates = session_files(sessions)
+    except OSError as exc:
+        return {"ok": False, "error": "cannot list session files: %s" % exc}
+    for _gen, name, path in candidates:
+        try:
+            read_session_file(path, state)
+            used.append(name)
+        except (PermissionError, OSError):
+            skipped.append((name, "in use by Chrome"))
+        except (ValueError, struct.error):
+            skipped.append((name, "not a readable session file"))
+
+    windows = build_live_model(state)
+    if not windows:
+        return {"ok": False,
+                "error": "no open Chrome windows found in the session files",
+                "skipped": ["%s (%s)" % s for s in skipped]}
+
+    # Windows get positional names: Chrome has no user-assigned window
+    # names, so the picker lists them in tab-strip order.
+    named = []
+    for i, win in enumerate(windows, start=1):
+        win["name"] = "Window %d" % i
+        named.append(win)
+
+    groups = {}
+    for win in named:
+        for tab in win["tabs"]:
+            gname = (tab.get("group") or "").strip()
+            if not gname:
+                continue
+            key = gname.lower()
+            g = groups.get(key)
+            if g is None:
+                g = groups[key] = {"name": gname, "color": tab.get("color"),
+                                   "count": 0}
+            if not g.get("color") and tab.get("color"):
+                g["color"] = tab["color"]
+            g["count"] += 1
+
+    return {
+        "ok": True,
+        "windows": named,
+        "groups": sorted(groups.values(), key=lambda g: g["name"].lower()),
+        "files": used,
+        "skipped": ["%s (%s)" % s for s in skipped],
+    }
 
 
 def send_bytes(handler, code, content_type, body):
@@ -861,6 +1449,11 @@ class Handler(BaseHTTPRequestHandler):
             send_text(self, 200, PAGE_HTML)
         elif u.path == "/api/files":
             send_json(self, 200, {"ok": True, "files": list_reports()})
+        elif u.path == "/api/live":
+            try:
+                send_json(self, 200, live_snapshot())
+            except Exception as exc:  # never take the editor down for this
+                send_json(self, 500, {"ok": False, "error": str(exc)})
         elif u.path == "/api/load":
             qs = parse_qs(u.query)
             name = (qs.get("name") or [""])[0]
@@ -929,9 +1522,13 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true",
                     help="Do not auto-open the browser")
+    ap.add_argument("--no-chrome", action="store_true",
+                    help="Disable importing tabs from the live Chrome "
+                         "session (no session files are read)")
     args = ap.parse_args(argv)
 
-    global BASE
+    global BASE, ALLOW_CHROME
+    ALLOW_CHROME = not args.no_chrome
     BASE = os.path.realpath(args.dir or os.path.dirname(
         os.path.abspath(__file__)))
     if not os.path.isdir(BASE):

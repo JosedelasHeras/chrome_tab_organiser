@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chrome_tab_organiser — v1.5 Quick Guide</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif; color:#20242e;
+         font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; }
+  h2 { font-size: 15pt; color:#1663c5; border-bottom: 2px solid #1663c5;
+       padding-bottom: 4pt; margin: 22pt 0 10pt; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 14pt 0 6pt; color:#1f2430; page-break-after: avoid; }
+  p { margin: 6pt 0; }
+  ul, ol { margin: 6pt 0; padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  tt, code { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+             background:#eef1f6; border-radius: 3px; padding: 0 3px; color:#0b3d91; }
+  pre { background:#1f2430; color:#e8ecf3; border-radius: 6px; padding: 9pt 11pt;
+        font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt;
+        white-space: pre-wrap; margin: 8pt 0; page-break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; font-size: 9.5pt; }
+  th { background:#eef2fb; color:#1f2430; text-align:left; padding:5pt 8pt;
+       border:1px solid #d7dbe2; }
+  td { padding:5pt 8pt; border:1px solid #d7dbe2; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .cover { text-align:center; margin-top: 40mm; }
+  .cover .sub { color:#6b7280; font-size: 12pt; margin-top: 14pt; }
+  .cover .tools { margin-top: 26pt; font-size: 11pt; }
+  .toc { background:#f6f7f9; border:1px solid #e5e7eb; border-radius:6px;
+         padding: 10pt 16pt; margin: 14pt 0; }
+  .toc ul { list-style: none; padding-left: 4pt; }
+  .toc li { margin: 2pt 0; }
+  .note { background:#fff8e6; border-left:4px solid #f29900; border-radius:4px;
+          padding: 8pt 11pt; margin: 10pt 0; }
+  .tip { background:#e9f5ec; border-left:4px solid #188038; border-radius:4px;
+         padding: 8pt 11pt; margin: 10pt 0; }
+  .warn { background:#fdeceb; border-left:4px solid #d93025; border-radius:4px;
+          padding: 8pt 11pt; margin: 10pt 0; }
+  .new { background:#e8f0fe; border-left:4px solid #1a73e8; border-radius:4px;
+         padding: 8pt 11pt; margin: 10pt 0; }
+  .filelist td:first-child { font-family: Consolas, monospace; font-size: 9pt;
+                             white-space: nowrap; }
+  .rowdemo { background:#f6f7f9; border:1px dashed #b9bfc9; border-radius:6px;
+             padding:10pt 12pt; margin:10pt 0; font-size:9.5pt; }
+  .rowdemo table { margin: 0; font-size: 9pt; }
+  .rowdemo td, .rowdemo th { border:1px solid #d7dbe2; }
+  .grip { background:#1a73e8; color:#fff; border-radius:3px; padding:0 4px;
+          font-weight:700; }
+  .grp { background:#1a73e8; color:#fff; padding:1px 5px; border-radius:3px; }
+  footer { margin-top: 20pt; color:#9aa0a6; font-size: 8.5pt; text-align:center; }
+  .small { font-size: 9pt; color:#6b7280; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>chrome_tab_organiser — v1.5 Quick Guide</h1>
+  <div class="sub">v1.5 Quick Guide — Import Chrome Tabs</div>
+  <div class="tools"><b>chrome_report_edit_v1.5.py</b><br>
+    &mdash; load a report, pick <b>Add tabs from window</b>,<br>
+    choose a Chrome window or group, press <b>Add tabs</b><br>
+    <br><br><b>chrome_report_v1.4.py</b><br>
+    &mdash; the report generator</div>
+  <p class="small">Document suffix <tt>_261005</tt> &mdash; self-contained
+  tools, Python standard library only.</p>
+</div>
+
+<div class="toc">
+  <b>Contents</b>
+  <ul><li>1. Do it in four clicks</li><li>2. Where the imported tabs land</li><li>3. What you get</li><li>4. Commands</li><li>5. If something looks wrong</li><li>6. Still true from earlier versions</li></ul>
+</div>
+
+<p><b>Import tabs from the running Chrome into any report window</b> <b>Date suffix:</b> <tt>_261005</tt> <b>Applies to:</b> <tt>chrome_report_edit_v1.5.py</tt></p>
+<h2>1. Do it in four clicks</h2>
+<pre>1. python chrome_report_edit_v1.5.py --dir reports
+2. Load the report
+3. Click  Add tabs from window   (in the header of the target window)
+4. Pick a Chrome window or a Chrome group  -&gt;  Add tabs</pre>
+<p>The dialog lists, live:</p>
+<ul><li><b>Chrome windows</b> — <tt>Window 1</tt>, <tt>Window 2</tt>, … with tab and group counts,</li></ul>
+<p>  <tt>· active</tt> on the one Chrome is showing;</p>
+<ul><li><b>Chrome tab groups</b> — every named group, with its tab count.</li></ul>
+<p>A line under the list tells you what will happen, e.g. <i>“18 tabs will be added, inserted at the beginning of the window.”</i></p>
+<p>Chrome keeps running. Nothing in Chrome is opened, closed or modified.</p>
+<h2>2. Where the imported tabs land</h2>
+<table><thead><tr><th>“sort groups alphabetically”</th><th>Placement</th></tr></thead><tbody><tr><td>unticked (default)</td><td>at the <b>very top</b> of the target window, in Chrome's tab-strip order</td></tr><tr><td>ticked</td><td>each tab placed <b>by its own group</b>, so the window stays sorted</td></tr></tbody></table>
+<h2>3. What you get</h2>
+<ul><li><b>Title, URL, group name and group colour</b> come across as they are in Chrome.</li><li>The <b>active-window star</b> does not.</li><li>Tabs already in the target window are <b>skipped</b>, and the count is reported:</li></ul>
+<p>  <tt>Added 18 tabs from Window 3 (2 already in this window).</tt></p>
+<ul><li>The duplicate check ignores letter case, a trailing slash and <tt>#fragment</tt>,</li></ul>
+<p>  so <tt>Example.com</tt>, <tt>example.com/</tt> and <tt>example.com#top</tt> are one page.</p>
+<ul><li>Import the same window again and it adds nothing.</li></ul>
+<p>Imported rows are ordinary rows — renumbered, editable and draggable.</p>
+<h2>4. Commands</h2>
+<pre>python chrome_report_edit_v1.5.py [--dir PATH] [--port 8765]
+                                   [--host 127.0.0.1] [--no-browser]
+                                   [--no-chrome]
+
+chrome_report_edit_v1.5.exe --dir reports          (no Python needed)
+
+--no-chrome       switch the live import off entirely; no session file is read</pre>
+<h2>5. If something looks wrong</h2>
+<table><thead><tr><th>Symptom</th><th>Answer</th></tr></thead><tbody><tr><td>“no open Chrome windows found”</td><td>Chrome has no session yet on this machine, or it isn't the Default profile.</td></tr><tr><td>The list is a moment behind</td><td>Chrome was writing its newest session file; the complete snapshot was used. Click the button again shortly.</td></tr><tr><td>“(--no-chrome)” in the message</td><td>Expected — you started the editor with that flag.</td></tr><tr><td>Window names don't match the report</td><td>Normal — Chrome has no window names; the picker uses <tt>Window 1…N</tt> in tab-strip order.</td></tr><tr><td>Nothing happens on click</td><td>The dialog reports the reason on its own status line; a fetch error appears in the browser console.</td></tr></tbody></table>
+<h2>6. Still true from earlier versions</h2>
+<ul><li>Drags start <b>only from the ↕ grip</b>; release over chip, grips, link or bare</li></ul>
+<p>  cell — over a link the tab lands just before that row.</p>
+<ul><li>“Sort groups alphabetically” turns itself off on a real drag; untick restores</li></ul>
+<p>  the previous order exactly.</p>
+<ul><li>Nothing is written to disk until you press <b>Save</b>.</li><li>Session files are read only; everything is localhost.</li></ul>
+<p>Run the checks with <tt>python test_editor_js.py</tt> (58 checks).</p>
+
+<footer>chrome_tab_organiser &mdash; v1.5 quick guide &middot; document suffix _261005</footer>
+
+</body>
+</html>

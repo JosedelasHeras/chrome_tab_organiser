@@ -16,3 +16,11 @@ chrome_tabs_Default*.html
 chrome_tabs_Default*.json
 v1_out/
 v1_1_out_260911/
+
+# older stuff folder
+older stuff/*
+
+# misc intermediates
+#build_exe.py
+test_editor_js.py
+

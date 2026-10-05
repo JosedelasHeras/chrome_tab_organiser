@@ -1,6 +1,7 @@
-"""Headless check of the v1.41 editor: the grip is the drag source, stray drags
+"""Headless check of the v1.5 editor: the grip is the drag source, stray drags
 are cancelled, drag reordering works inside a window and across windows,
-data-pos renumbering, sort auto-uncheck on real drags only, and a clean save.
+data-pos renumbering, sort auto-uncheck on real drags only, a clean save, and
+importing tabs from the live Chrome session.
 
 Run from this directory:  python test_editor_js.py
 """
@@ -14,7 +15,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-EDITOR = os.path.join(HERE, "chrome_report_edit_v1.41.py")
+EDITOR = os.path.join(HERE, "chrome_report_edit_v1.5.py")
 CHROME_CANDIDATES = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -63,6 +64,44 @@ tr{height:22px}
 # A legacy v1.3-era report: no data-pos anywhere.
 LEGACY = re.sub(r' data-pos="\d+"', "", FIXTURE)
 
+# What /api/live returns: Chrome's windows (no names of their own) and its
+# named tab groups. Window 1 deliberately repeats https://a.example/ so the
+# duplicate-URL skip can be checked, and https://b.example/ differs from the
+# fixture only by trailing slash and case.
+LIVE = {
+    "ok": True,
+    "windows": [
+        {"id": 101, "name": "Window 1", "active": True, "tabs": [
+            {"title": "Solo", "url": "https://solo.example/",
+             "group": None, "color": None},
+            {"title": "Alpha dup", "url": "https://a.example/",
+             "group": None, "color": None},
+            {"title": "Alpha slash", "url": "https://A.EXAMPLE",
+             "group": None, "color": None},
+            {"title": "Zed grp", "url": "https://zed.example/",
+             "group": "Zulu", "color": "#d01884"},
+            {"title": "Bravo grp", "url": "https://bravo.example/",
+             "group": "Bravo", "color": "#188038"},
+        ]},
+        {"id": 102, "name": "Window 2", "active": False, "tabs": [
+            {"title": "Echo", "url": "https://e.example/",
+             "group": None, "color": None},
+            {"title": "Zed two", "url": "https://zed2.example/",
+             "group": "Zulu", "color": "#d01884"},
+        ]},
+    ],
+    "groups": [
+        {"name": "Bravo", "color": "#188038", "count": 1},
+        {"name": "Zulu", "color": "#d01884", "count": 2},
+    ],
+    "files": ["Session_1"],
+    "skipped": ["Tabs_2 (in use by Chrome)"],
+}
+
+# Used to check the failure path of the picker.
+LIVE_ERROR = {"ok": False,
+              "error": "no open Chrome windows found in the session files"}
+
 STUB = r"""
 <script>
 window.__log = [];
@@ -71,11 +110,17 @@ window.addEventListener('error', function (e) {
   say('JS ERROR: ' + e.message + ' @' + e.lineno + ':' + e.colno);
 });
 var __files = window.__files || {};
+var __live = window.__live;
 window.fetch = function (url, opts) {
   var u = String(url);
   if (u.indexOf('/api/files') === 0) {
     return Promise.resolve({ json: function () {
       return Promise.resolve({ ok: true, files: ['fixture.html', 'legacy.html'] });
+    }});
+  }
+  if (u.indexOf('/api/live') === 0) {
+    return Promise.resolve({ json: function () {
+      return Promise.resolve(__live);
     }});
   }
   if (u.indexOf('/api/load') === 0) {
@@ -159,6 +204,48 @@ async function waitDoc(pred, label) {
   }
   say('TIMEOUT waiting for ' + label);
   return false;
+}
+
+async function waitFor(pred, label) {
+  for (var i = 0; i < 300; i++) {
+    if (pred()) return true;
+    await sleep(50);
+  }
+  say('TIMEOUT waiting for ' + label);
+  return false;
+}
+function groupsOf(w) {
+  return rowsOf(w).map(function (tr) {
+    var c = tr.querySelector('td.group .chip');
+    return c && c.className.indexOf('none') < 0 ? c.textContent.trim() : '-';
+  }).join(',');
+}
+function colorsOf(w) {
+  return rowsOf(w).map(function (tr) {
+    var c = tr.querySelector('td.group .chip');
+    return c ? (c.getAttribute('style') || '') : '';
+  }).join('|');
+}
+function urlsOf(w) {
+  return rowsOf(w).map(function (tr) {
+    var a = tr.querySelector('td.url a');
+    return a ? a.getAttribute('href') : '';
+  }).join(',');
+}
+function optionLabels() {
+  return Array.prototype.map.call(wSource.options, function (o) {
+    return o.textContent;
+  }).join(' | ');
+}
+async function pickImport(winIdx, optIndex) {
+  openImport(winIdx);
+  await waitFor(function () {
+    return wModal.classList.contains('open') &&
+           (wSource.options.length > 0 || wInfo.textContent.indexOf(':') > 0);
+  }, 'import modal');
+  if (wSource.options.length) wSource.selectedIndex = optIndex;
+  doImport();
+  await sleep(60);
 }
 
 window.__run = async function () {
@@ -259,8 +346,105 @@ window.__run = async function () {
     say('editor usable after save=' +
         (FDOC.querySelectorAll('.ce-grip').length ===
          rowsOf(wins()[0]).length + rowsOf(wins()[1]).length));
+    say('save strips the import button=' +
+        (out.indexOf('ce-addwin') < 0 && out.indexOf('Add tabs from window') < 0));
 
-    /* a legacy report without data-pos stays without */
+    /* ---- import tabs from the live Chrome session (v1.5) ---- */
+    doLoad('fixture.html');
+    await waitDoc(function () { return rowsOf(wins()[0]).length === 4; },
+                  'fixture reloaded');
+    var iw1 = wins()[0], iw2 = wins()[1];
+    say('import buttons=' + FDOC.querySelectorAll('.ce-addwin').length +
+        ' expected=2');
+    say('import buttons in headers=' +
+        FDOC.querySelectorAll('.window-head .ce-addwin').length);
+    say('import button is ce-inject=' +
+        (FDOC.querySelector('.ce-addwin').className.indexOf('ce-inject') >= 0));
+
+    openImport(0);
+    await waitFor(function () { return wSource.options.length > 0; },
+                  'live picker');
+    say('import modal open=' + wModal.classList.contains('open'));
+    say('import optgroups=' + wSource.querySelectorAll('optgroup').length);
+    say('import option labels=' + optionLabels());
+    say('import info=' + wInfo.textContent);
+
+    /* import the named group "Zulu" (2 tabs across both Chrome windows) */
+    var zulu = -1;
+    for (var oi = 0; oi < wSource.options.length; oi++) {
+      if (wSource.options[oi].value.indexOf('g\tZulu') === 0) zulu = oi;
+    }
+    say('zulu option index=' + zulu);
+    wSource.selectedIndex = zulu;
+    refreshImportInfo();
+    say('group import info=' + wInfo.textContent);
+    doImport();
+    await sleep(60);
+    say('group import titles=' + titlesOf(iw1));
+    say('group import groups=' + groupsOf(iw1));
+    say('group import colors=' + colorsOf(iw1));
+    say('group import urls=' + urlsOf(iw1));
+    say('group import rows=' + rowsOf(iw1).length);
+    say('group import pos=' + posOf(iw1));
+    say('group import seq ok=' + seqOk(iw1));
+    say('group import modal closed=' + !wModal.classList.contains('open'));
+    say('group import no star=' +
+        (FDOC.querySelectorAll('td.tab .active-star').length === 0));
+    say('group import editable=' +
+        (rowsOf(iw1)[0].querySelector('.ce-grip') !== null &&
+         rowsOf(iw1)[0].querySelector('.ce-del') !== null));
+
+    /* import a whole Chrome window: unsorted prepend, in source order,
+       with the URL already in this window skipped */
+    doLoad('fixture.html');
+    await waitDoc(function () { return rowsOf(wins()[0]).length === 4; },
+                  'fixture reloaded again');
+    iw1 = wins()[0];
+    var before = rowsOf(iw1).length;
+    await pickImport(0, 0);
+    say('win import before=' + before + ' after=' + rowsOf(iw1).length);
+    say('win import titles=' + titlesOf(iw1));
+    say('win import urls=' + urlsOf(iw1));
+    say('win import seq ok=' + seqOk(iw1) + ' pos=' + posOf(iw1));
+    say('win import a dup skipped=' +
+        (rowsOf(iw1).length === 7));
+    say('win import status=' + statusEl.textContent);
+
+    /* importing the same window twice adds nothing the second time */
+    var twice = rowsOf(iw1).length;
+    await pickImport(0, 0);
+    say('win import again rows=' + rowsOf(iw1).length +
+        ' unchanged=' + (rowsOf(iw1).length === twice));
+
+    /* sorted: ungrouped first, then each tab by its own group A-Z */
+    doLoad('fixture.html');
+    await waitDoc(function () { return rowsOf(wins()[0]).length === 4; },
+                  'fixture reloaded for sort');
+    iw2 = wins()[1];
+    sortChk.checked = true;
+    sortChk.dispatchEvent(new Event('change'));
+    await pickImport(1, 0);
+    say('sorted import titles=' + titlesOf(iw2));
+    say('sorted import groups=' + groupsOf(iw2));
+    say('sorted import seq ok=' + seqOk(iw2));
+    say('sorted import colors=' + colorsOf(iw2));
+
+    /* the picker reports a readable error and changes nothing */
+    doLoad('fixture.html');
+    await waitDoc(function () { return rowsOf(wins()[0]).length === 4; },
+                  'fixture reloaded for error');
+    iw1 = wins()[0];
+    window.__live = window.__live_error;
+    openImport(0);
+    await waitFor(function () {
+      return wInfo.textContent.indexOf('not available') >= 0;
+    }, 'import error');
+    say('import error text=' + wInfo.textContent);
+    say('import error options=' + wSource.options.length);
+    say('import error rows unchanged=' + (rowsOf(iw1).length === 4));
+    window.__live = window.__live_ok;
+
+    /* ---- a legacy report without data-pos stays without ---- */
     doLoad('legacy.html');
     await waitDoc(function () {
       return FDOC.querySelectorAll('[data-pos]').length === 0 &&
@@ -368,6 +552,80 @@ def build_checks():
         ("save keeps data-pos", lambda t: "save keeps data-pos=true" in t),
         ("editor usable after save",
          lambda t: "editor usable after save=true" in t),
+        ("save strips the import button",
+         lambda t: "save strips the import button=true" in t),
+        # ---- v1.5: import tabs from the live Chrome session ----
+        ("import button on every window header",
+         lambda t: "import buttons=2 expected=2" in t
+         and "import buttons in headers=2" in t),
+        ("import button is editor chrome, not report content",
+         lambda t: "import button is ce-inject=true" in t),
+        ("picker opens and lists windows and groups",
+         lambda t: "import modal open=true" in t
+         and "import optgroups=2" in t),
+        ("picker labels carry tab/group counts and the active window",
+         lambda t: "import option labels=" in t
+         and "Window 1 — 5 tabs · 2 groups · active" in t
+         and "Window 2 — 2 tabs · 1 group" in t
+         and "Zulu — 2 tabs" in t),
+        ("picker previews the tabs it would add",
+         lambda t: "import info=5 tabs will be added, inserted at the "
+                   "beginning of the window." in t),
+        ("named group import copies every tab of that group",
+         lambda t: "group import titles=Zed grp,Zed two,Alpha,Bravo,"
+                   "Charlie,Delta" in t),
+        ("picker previews the group it will import",
+         lambda t: "group import info=2 tabs will be added, inserted at the "
+                   "beginning of the window." in t),
+        ("imported tabs keep their group name",
+         lambda t: "group import groups=Zulu,Zulu,ChIP,ChIP,RNA,-" in t),
+        ("imported tabs keep their group colour",
+         lambda t: "group import colors=background:#d01884|"
+                   "background:#d01884|background:#1a73e8|"
+                   "background:#1a73e8|background:#0b8043|" in t),
+        ("imported tabs keep their title and URL",
+         lambda t: "group import urls=https://zed.example/,https://zed2.example/,"
+                   "https://a.example/,https://b.example/,https://c.example/,"
+                   "https://d.example/" in t),
+        ("imported rows renumber data-pos from 1",
+         lambda t: "group import pos=1,2,3,4,5,6" in t
+         and "group import seq ok=true" in t),
+        ("imported rows are editable and draggable",
+         lambda t: "group import editable=true" in t),
+        ("import never carries the active star",
+         lambda t: "group import no star=true" in t),
+        ("import closes the picker when it succeeds",
+         lambda t: "group import modal closed=true" in t),
+        ("whole-window import prepends in source order",
+         lambda t: "win import titles=Solo,Zed grp,Bravo grp,Alpha,Bravo,"
+                   "Charlie,Delta" in t),
+        ("whole-window import skips URLs already in the window",
+         lambda t: "win import before=4 after=7" in t
+         and "win import a dup skipped=true" in t),
+        ("duplicate skip ignores case and a trailing slash",
+         lambda t: re.search(
+             r"win import titles=[^\n]*", t).group(0) ==
+             "win import titles=Solo,Zed grp,Bravo grp,Alpha,Bravo,"
+             "Charlie,Delta"),
+        ("whole-window import renumbers data-pos",
+         lambda t: "win import seq ok=true pos=1,2,3,4,5,6,7" in t),
+        ("whole-window import reports what it did",
+         lambda t: "win import status=Added 3 tabs from " in t
+         and "2 already in this window" in t),
+        ("importing the same source twice adds nothing",
+         lambda t: "win import again rows=7 unchanged=true" in t),
+        ("sorted import keeps ungrouped first, then groups A-Z",
+         lambda t: "sorted import titles=Solo,Alpha dup,Alpha slash,"
+                   "Bravo grp,Echo,Foxtrot,Zed grp" in t),
+        ("sorted import assigns each tab its own group",
+         lambda t: "sorted import groups=-,-,-,Bravo,ChIP,ChIP,Zulu" in t),
+        ("sorted import renumbers data-pos",
+         lambda t: "sorted import seq ok=true" in t),
+        ("import failure is reported and changes nothing",
+         lambda t: "import error text=Chrome session not available: no open "
+                   "Chrome windows found in the session files" in t
+         and "import error options=0" in t
+         and "import error rows unchanged=true" in t),
         ("legacy report has no data-pos",
          lambda t: "legacy data-pos count=0" in t),
         ("legacy drag adds no data-pos",
@@ -388,7 +646,7 @@ def main():
     if not os.path.isfile(EDITOR):
         print("FAIL: %s missing" % EDITOR)
         return 1
-    spec = importlib.util.spec_from_file_location("e14", EDITOR)
+    spec = importlib.util.spec_from_file_location("e15", EDITOR)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
 
@@ -404,6 +662,11 @@ def main():
     files = files.replace("</", "<\\/")
     stub = STUB.replace("var __files = window.__files || {};",
                         "var __files = %s;" % files)
+    stub = stub.replace("var __live = window.__live;",
+                        "window.__live_ok = %s;\n"
+                        "window.__live_error = %s;\n"
+                        "var __live = window.__live_ok;"
+                        % (json.dumps(LIVE), json.dumps(LIVE_ERROR)))
     page = page_src.replace("<body>", "<body>\n" + stub, 1)
     head, sep, tail = page.rpartition("</body>")
     if not sep:
